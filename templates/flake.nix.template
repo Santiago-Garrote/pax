@@ -1,0 +1,20 @@
+{
+  outputs = { self, nixpkgs }:
+    let
+      pkgs = import nixpkgs {
+        system = "x86_64-linux";
+      };
+
+      papers = import ./papers.nix;
+
+      mkPaper = name: paper:
+        pkgs.fetchurl {
+          name = name;
+          url = paper.url;
+          hash = paper.hash;
+        };
+    in {
+      packages.x86_64-linux =
+        builtins.mapAttrs mkPaper papers;
+    };
+}

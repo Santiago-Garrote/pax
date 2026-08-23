@@ -30,7 +30,6 @@ Creates the minimum required structure:
 research/
 ├── flake.nix
 ├── papers.nix
-└── metadata/
 ```
 
 The library should be Git-friendly and reproducible.
@@ -59,7 +58,16 @@ Search results should expose:
 * Source/provider
 * Whether the paper is already in the library
 
-The MVP should initially support only a small number of reliable providers.
+#### MVP providers
+
+The MVP should initially support only a small number of reliable providers:
+- OpenAlex — primary general-purpose academic discovery and metadata.
+- Crossref — DOI resolution and canonical bibliographic metadata.
+- Semantic Scholar — academic discovery, citations, references, and related papers.
+- arXiv — preprints and papers, particularly for computer science, mathematics, and physics.
+- DBLP — specialized computer-science bibliography and metadata.
+
+These providers should be implemented behind a common PAX discovery interface so that adding providers later does not require changing the CLI or paper model.
 
 ---
 
