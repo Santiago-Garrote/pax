@@ -14,7 +14,7 @@
     }:
     let
       pkgs = nixpkgs.legacyPackages."x86_64-linux";
-      app_deps = [ ];
+      app_deps = [ pkgs.openssl ];
       naerskLib = pkgs.callPackage naersk { };
     in
     {
@@ -26,6 +26,7 @@
       };
 
       devShells."x86_64-linux".default = pkgs.mkShell {
+        nativeBuildInputs = [ pkgs.pkg-config ];
         buildInputs =
           with pkgs;
           [
@@ -37,6 +38,12 @@
           ]
           ++ app_deps;
         env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+      };
+
+      env = {
+        RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+        PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+        OPENSSL_DIR = "${pkgs.openssl.dev}";
       };
 
     };
