@@ -7,6 +7,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use crossref::{Crossref, WorkList};
 use papers_openalex::{ListParams, ListResponse, OpenAlexClient, OpenAlexError};
+use semantic_scholar::{Paper, SemanticScholar};
 
 #[derive(Subcommand)]
 enum Command {
@@ -74,6 +75,14 @@ impl From<crossref::Work> for Work {
     }
 }
 
+impl From<semantic_scholar::Paper> for Work {
+    fn from(value: semantic_scholar::Paper) -> Self {
+        Work {
+            title: value.title.expect("Paper does not have title!"),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 enum SearchError {
     #[error("request failed: {0}")]
@@ -92,18 +101,30 @@ impl From<crossref::Error> for SearchError {
     }
 }
 
+impl From<semantic_scholar::Error> for SearchError {
+    fn from(value: semantic_scholar::Error) -> Self {
+        SearchError::Request(value.to_string())
+    }
+}
+
 async fn search(query: String) -> Result<Vec<Work>, SearchError> {
     let mut final_results: Vec<Work> = Vec::new();
     match open_alex_search(query.clone()).await {
         Ok(alex_results) => final_results.extend(alex_results.results.into_iter().map(Work::from)),
         Err(e) => println!("OpenAlex error: {}", e),
     };
-    match cross_ref_search(query).await {
+    match crossref_search(query.clone()).await {
         Ok(crossref_results) => {
-            final_results.extend(crossref_results.items.into_iter().map(Work::from))
+            final_results.extend(crossref_results.items.into_iter().map(Work::from));
         }
         Err(e) => println!("Crossref error: {}", e),
     };
+    match semanticscholar_search(query.clone()).await {
+        Ok(semanticscholar_results) => {
+            final_results.extend(semanticscholar_results.into_iter().map(Work::from));
+        }
+        Err(e) => println!("Semmantic Scholar error: {}", e),
+    }
     Ok(final_results)
 }
 
@@ -115,7 +136,13 @@ async fn open_alex_search(
     client.list_works(&params).await
 }
 
-async fn cross_ref_search(query: String) -> Result<WorkList, crossref::Error> {
+async fn crossref_search(query: String) -> Result<WorkList, crossref::Error> {
     let client = Crossref::builder().build()?;
     client.works(query)
+}
+
+async fn semanticscholar_search(query: String) -> Result<Vec<Paper>, semantic_scholar::Error> {
+    let client = SemanticScholar::with_api_key("s2k-lqEUK8qhHH5MGk6NKa76zDxmrZxXB6wPJ5uWsPJJ")?;
+    let result = client.search_papers(&query).send().await?;
+    Ok(result.data)
 }
