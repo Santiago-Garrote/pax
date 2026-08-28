@@ -1,12 +1,14 @@
 use core::str;
 use std::{
+    collections::HashMap,
     fs::{create_dir, write},
     io::Error,
 };
 
+use arxiv_client::{Arxiv, Search};
 use clap::{Parser, Subcommand};
 use crossref::{Crossref, WorkList};
-use papers_openalex::{ListParams, ListResponse, OpenAlexClient, OpenAlexError};
+use papers_openalex::{ListParams, ListResponse, OpenAlexClient, OpenAlexError, client};
 use semantic_scholar::{Paper, SemanticScholar};
 
 #[derive(Subcommand)]
@@ -37,9 +39,12 @@ async fn main() {
             let _result = init();
         }
         Command::Search { query } => match search(query).await {
-            Ok(works) => {
-                for work in works {
-                    println!("{}", work.title);
+            Ok(provider_works) => {
+                for (provider, works) in provider_works {
+                    println!("{}:", provider);
+                    for work in works {
+                        println!("\t{}", work.title);
+                    }
                 }
             }
             Err(e) => println!("Error in search: {}", e),
@@ -83,6 +88,12 @@ impl From<semantic_scholar::Paper> for Work {
     }
 }
 
+impl From<arxiv_client::Entry> for Work {
+    fn from(value: arxiv_client::Entry) -> Self {
+        Work { title: value.title }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 enum SearchError {
     #[error("request failed: {0}")]
@@ -107,21 +118,44 @@ impl From<semantic_scholar::Error> for SearchError {
     }
 }
 
-async fn search(query: String) -> Result<Vec<Work>, SearchError> {
-    let mut final_results: Vec<Work> = Vec::new();
+async fn search(query: String) -> Result<HashMap<String, Vec<Work>>, SearchError> {
+    let mut final_results: HashMap<String, Vec<Work>> = HashMap::new();
     match open_alex_search(query.clone()).await {
-        Ok(alex_results) => final_results.extend(alex_results.results.into_iter().map(Work::from)),
+        Ok(alex_results) => {
+            final_results.insert(
+                String::from("OpenAlex"),
+                alex_results.results.into_iter().map(Work::from).collect(),
+            );
+        }
         Err(e) => println!("OpenAlex error: {}", e),
     };
     match crossref_search(query.clone()).await {
         Ok(crossref_results) => {
-            final_results.extend(crossref_results.items.into_iter().map(Work::from));
+            final_results.insert(
+                String::from("Crossref"),
+                crossref_results.items.into_iter().map(Work::from).collect(),
+            );
         }
         Err(e) => println!("Crossref error: {}", e),
     };
     match semanticscholar_search(query.clone()).await {
         Ok(semanticscholar_results) => {
-            final_results.extend(semanticscholar_results.into_iter().map(Work::from));
+            final_results.insert(
+                String::from("SemmanticScholar"),
+                semanticscholar_results
+                    .into_iter()
+                    .map(Work::from)
+                    .collect(),
+            );
+        }
+        Err(e) => println!("Semmantic Scholar error: {}", e),
+    }
+    match arxiv_search(query.clone()).await {
+        Ok(arxiv_results) => {
+            final_results.insert(
+                String::from("ArXiV"),
+                arxiv_results.into_iter().map(Work::from).collect(),
+            );
         }
         Err(e) => println!("Semmantic Scholar error: {}", e),
     }
@@ -145,4 +179,12 @@ async fn semanticscholar_search(query: String) -> Result<Vec<Paper>, semantic_sc
     let client = SemanticScholar::with_api_key("s2k-lqEUK8qhHH5MGk6NKa76zDxmrZxXB6wPJ5uWsPJJ")?;
     let result = client.search_papers(&query).send().await?;
     Ok(result.data)
+}
+
+async fn arxiv_search(query: String) -> Result<Vec<arxiv_client::Entry>, arxiv_client::Error> {
+    let client = Arxiv::builder()
+        .contact("santiagogarrote2005@gmail.com")
+        .build()?;
+    let query = Search::title(query);
+    Ok(client.search(query).await?.entries)
 }

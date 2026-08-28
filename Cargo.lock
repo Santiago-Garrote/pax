@@ -77,6 +77,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "arxiv-client"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4740d71937f33036d05af331d5f14b8a317478343ef141bc629ea720506d300f"
+dependencies = [
+ "async-iterator",
+ "chrono",
+ "percent-encoding 2.3.2",
+ "quick-xml",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio 1.53.1",
+ "tracing",
+]
+
+[[package]]
+name = "async-iterator"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "742b2f12ff517f144b6181d24f3f2481b503e05650ee79feec1f090048089f88"
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1679,6 +1703,7 @@ dependencies = [
 name = "pax"
 version = "0.1.0"
 dependencies = [
+ "arxiv-client",
  "clap",
  "crossref",
  "dotenvy",
@@ -1748,6 +1773,16 @@ checksum = "95b4ce31ff0a27d93c8de1849cf58162283752f065a90d508f1105fa6c9a213f"
 dependencies = [
  "idna 0.2.3",
  "url 2.5.8",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.38.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]
