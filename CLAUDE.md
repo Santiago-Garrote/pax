@@ -9,7 +9,7 @@ PAX is a Rust project for discovering, declaring, managing, and reproducibly acq
 - PAX handles: academic search, metadata resolution, source resolution, paper declarations, local organization, bibliography export.
 - Nix handles: fetching, hashing, verification, caching, storage, garbage collection.
 
-Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see `docs/mvp.md` for the full command surface and design philosophy, and `docs/status.md` for which parts of it are actually implemented — `pax sync` and `pax check` are still planned, not yet built).
+Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see `docs/mvp.md` for the full command surface and design philosophy, and `docs/status.md` for which parts of it are actually implemented — `pax sync` and `pax open` are still planned, not yet built).
 
 **This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; a future `lazypax` TUI (or any other adapter) is meant to be just another client of the same library, per the project's own README. `docs/mvp.md` is the forward-looking spec for the full command surface — don't assume a command or flag exists just because it's documented there. **`docs/status.md` tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item.
 
@@ -62,7 +62,7 @@ src/
 
 See `docs/status.md` for the full, kept-current checklist of implemented vs. missing
 pieces against `docs/mvp.md`'s target command surface. Briefly: `init`, `search`,
-`show`, `add`, `list`, `remove`, `edit`, `fetch`, and `export bibtex` exist; `sync`,
-`check`, `open`, and the DBLP provider don't yet — each is meant to be a small,
+`show`, `add`, `list`, `remove`, `edit`, `fetch`, `check`, and `export bibtex` exist;
+`sync`, `open`, and the DBLP provider don't yet — each is meant to be a small,
 well-typed addition on top of `Provider`/`CandidateId`/`Library`/`PaperRef`, rather
 than needing another architectural change first.

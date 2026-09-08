@@ -20,7 +20,8 @@ it should stay accurate rather than aspirational.
 - [ ] `pax edit <key>` — Identity corrections (title/authors/year/doi)
 - [x] `pax remove <key>`
 - [x] `pax fetch <key>` — materialize via `nix store prefetch-file`, write `hash`
-- [ ] `pax check` — verify declared artifacts still reproduce, without materializing
+- [x] `pax check` — verifies every declared artifact against its recorded hash, exits
+      non-zero on any mismatch/error, without writing or materializing anything
 - [ ] `pax sync` — reconcile `research/` against `papers.nix`
 - [ ] `pax open <key>` — launch configured PDF viewer, prompt-to-fetch if not materialized
 - [x] `pax export bibtex`
@@ -74,7 +75,7 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 ## Critical path
 
-`fetch` is done, which unlocked `hash` and a working `nix build` — `check`, `sync`, and
-`open` are next, since they build directly on `fetch`'s hash. Everything else on this
-list is a smaller, independent gap (DBLP, display fields, filters, local search, edit
-corrections) that doesn't block or get blocked by anything else.
+`fetch` and `check` are done, both built on `nix::prefetch_file` — `sync` and `open` are
+next. Everything else on this list is a smaller, independent gap (DBLP, display fields,
+filters, local search, edit corrections) that doesn't block or get blocked by anything
+else.
