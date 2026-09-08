@@ -10,7 +10,7 @@
       mkPaper = name: paper:
         pkgs.fetchurl {
           name = name;
-          url = paper.url;
+          url = paper.source_url;
           hash = paper.hash;
         };
     in {
