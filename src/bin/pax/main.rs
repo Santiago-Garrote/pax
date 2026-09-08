@@ -103,6 +103,7 @@ async fn main() {
         },
         Command::Search { query } => {
             let results = pax_core::search_all(&query, &config).await;
+            let known_dois = pax_core::known_dois(Path::new("."));
             for provider in [
                 ProviderId::OpenAlex,
                 ProviderId::Crossref,
@@ -111,7 +112,7 @@ async fn main() {
             ] {
                 sink.provider_header(provider);
                 match results.get(&provider) {
-                    Some(Ok(works)) => sink.candidates(works),
+                    Some(Ok(works)) => sink.candidates(works, &known_dois),
                     Some(Err(e)) => sink.error(&e.to_string()),
                     None => {}
                 }

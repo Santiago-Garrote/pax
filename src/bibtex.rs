@@ -59,6 +59,7 @@ mod tests {
                 title: "Actors: A Model".to_string(),
                 authors: vec!["Gul Agha".to_string(), "Carl Hewitt".to_string()],
                 year: Some(1986),
+                venue: None,
             },
             artifact: Artifact::default(),
             local: Local {
@@ -76,6 +77,7 @@ mod tests {
                 title: "A minimal paper".to_string(),
                 authors: vec![],
                 year: None,
+                venue: None,
             },
             artifact: Artifact::default(),
             local: Local {

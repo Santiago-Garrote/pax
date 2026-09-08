@@ -79,6 +79,8 @@ mod tests {
             publish_date: publish_date.to_string(),
             doi: None,
             pdf_url: None,
+            venue: None,
+            abstract_text: None,
         }
     }
 

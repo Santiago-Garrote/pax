@@ -81,6 +81,7 @@ fn write_entry(out: &mut String, paper: &Paper) {
     write_field_string(out, "title", &paper.identity.title);
     write_field_string_list(out, "authors", &paper.identity.authors);
     write_field_int_opt(out, "year", paper.identity.year);
+    write_field_string_opt(out, "venue", paper.identity.venue.as_deref());
     write_field_string_opt(out, "source_url", paper.artifact.source_url.as_deref());
     write_field_string_opt(out, "hash", paper.artifact.hash.as_deref());
     write_field_string_list(out, "tags", &paper.local.tags);
@@ -400,6 +401,7 @@ fn paper_from_fields(citation_key: String, mut fields: HashMap<String, Value>) -
     let title = take_string(&mut fields, "title")?;
     let authors = take_string_list(&mut fields, "authors")?;
     let year = take_int_opt(&mut fields, "year")?;
+    let venue = take_string_opt(&mut fields, "venue")?;
     let source_url = take_string_opt(&mut fields, "source_url")?;
     let hash = take_string_opt(&mut fields, "hash")?;
     let tags = take_string_list(&mut fields, "tags")?;
@@ -417,6 +419,7 @@ fn paper_from_fields(citation_key: String, mut fields: HashMap<String, Value>) -
             title,
             authors,
             year,
+            venue,
         },
         artifact: Artifact { source_url, hash },
         local: Local {
@@ -439,6 +442,7 @@ mod tests {
                     title: "On Computable Numbers".to_string(),
                     authors: vec!["Alan M. Turing".to_string()],
                     year: Some(1936),
+                    venue: Some("Proceedings of the London Mathematical Society".to_string()),
                 },
                 artifact: Artifact {
                     source_url: Some("https://example.org/turing1936.pdf".to_string()),
@@ -456,6 +460,7 @@ mod tests {
                     title: "A paper with no DOI or notes".to_string(),
                     authors: vec![],
                     year: None,
+                    venue: None,
                 },
                 artifact: Artifact {
                     source_url: None,

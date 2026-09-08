@@ -75,6 +75,8 @@ impl From<::crossref::Work> for CandidateWork {
                     .find(|link| link.content_type.as_deref() == Some("application/pdf"))
                     .map(|link| link.url.clone())
             }),
+            venue: value.container_title.and_then(|titles| titles.into_iter().next()),
+            abstract_text: value.abstract_,
         }
     }
 }

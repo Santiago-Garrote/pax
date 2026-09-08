@@ -11,7 +11,7 @@ pub mod nix;
 pub mod paper;
 pub mod provider;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub use error::PaxError;
@@ -129,6 +129,7 @@ pub async fn add_candidate(
             title: work.title.clone(),
             authors: work.authors.clone(),
             year: year_from_publish_date(&work.publish_date),
+            venue: work.venue.clone(),
         },
         artifact: Artifact {
             source_url: work.pdf_url.clone(),
@@ -143,6 +144,101 @@ pub async fn add_candidate(
     library.save(&path)?;
 
     Ok(PaperRef(citation_key))
+}
+
+/// Strips a leading `https://doi.org/` from a DOI, if present. Providers
+/// disagree on format — OpenAlex returns a full URL, Crossref/Semantic
+/// Scholar/arXiv return a bare DOI — so comparing two DOIs for the same
+/// paper (e.g. to detect "already in library") needs this first, or a
+/// match can be silently missed depending on which provider each one came
+/// from.
+pub fn normalize_doi(doi: &str) -> &str {
+    doi.trim_start_matches("https://doi.org/")
+}
+
+/// The set of (normalized) DOIs already declared in the local library, used
+/// to mark `search` results that are already `add`ed. Returns an empty set
+/// rather than an error when the library can't be loaded (e.g. `search`
+/// before `init`) — search should still work, just with nothing marked as
+/// declared.
+pub fn known_dois(root: &Path) -> HashSet<String> {
+    Library::load(&nix::papers_path(root))
+        .map(|library| {
+            library
+                .papers()
+                .iter()
+                .filter_map(|p| p.identity.doi.as_deref())
+                .map(|doi| normalize_doi(doi).to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod known_dois_tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn normalize_doi_strips_url_prefix() {
+        assert_eq!(
+            normalize_doi("https://doi.org/10.1145/3474085.3475385"),
+            "10.1145/3474085.3475385"
+        );
+        assert_eq!(normalize_doi("10.1145/3474085.3475385"), "10.1145/3474085.3475385");
+    }
+
+    #[test]
+    fn known_dois_normalizes_and_ignores_papers_without_a_doi() {
+        let root = std::env::temp_dir().join(format!(
+            "pax-known-dois-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("research")).unwrap();
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  withDoi = {
+    doi = "https://doi.org/10.1145/3474085.3475385";
+    title = "Has a DOI";
+    authors = [ ];
+    year = null;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+  withoutDoi = {
+    doi = null;
+    title = "No DOI";
+    authors = [ ];
+    year = null;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        let dois = known_dois(&root);
+        assert_eq!(dois.len(), 1);
+        assert!(dois.contains("10.1145/3474085.3475385"));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn known_dois_is_empty_when_library_cannot_be_loaded() {
+        let root = std::env::temp_dir().join(format!(
+            "pax-known-dois-missing-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        assert!(known_dois(&root).is_empty());
+    }
 }
 
 /// The result of resolving a `show` reference: either a paper already

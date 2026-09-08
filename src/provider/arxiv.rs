@@ -61,6 +61,8 @@ impl From<arxiv_client::Entry> for CandidateWork {
                 .iter()
                 .find(|link| link.title.as_deref() == Some("pdf"))
                 .map(|link| link.href.clone()),
+            venue: value.journal_ref,
+            abstract_text: Some(value.summary),
         }
     }
 }

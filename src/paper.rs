@@ -11,6 +11,7 @@ pub struct Identity {
     pub title: String,
     pub authors: Vec<String>,
     pub year: Option<i32>,
+    pub venue: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

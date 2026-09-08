@@ -114,6 +114,8 @@ pub struct CandidateWork {
     pub publish_date: String,
     pub doi: Option<String>,
     pub pdf_url: Option<String>,
+    pub venue: Option<String>,
+    pub abstract_text: Option<String>,
 }
 
 #[derive(Debug, Error)]

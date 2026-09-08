@@ -63,6 +63,8 @@ impl From<::semantic_scholar::Paper> for CandidateWork {
                 .open_access_pdf
                 .as_ref()
                 .and_then(|pdf| pdf.url.clone()),
+            venue: value.venue,
+            abstract_text: value.abstract_text,
         }
     }
 }

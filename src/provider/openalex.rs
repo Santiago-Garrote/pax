@@ -76,6 +76,11 @@ impl From<papers_openalex::Work> for CandidateWork {
                 .as_ref()
                 .and_then(|loc| loc.pdf_url.clone())
                 .or_else(|| value.open_access.as_ref().and_then(|oa| oa.oa_url.clone())),
+            venue: value
+                .primary_location
+                .and_then(|loc| loc.source)
+                .and_then(|source| source.display_name),
+            abstract_text: value.abstract_text,
         }
     }
 }

@@ -3,13 +3,17 @@
 //! output mode (e.g. JSON, for an external adapter UI) is a new `Sink` impl
 //! rather than a rewrite of every command handler.
 
-use pax_core::{CandidateWork, CheckReport, CheckStatus, FetchOutcome, Paper, ProviderId};
+use std::collections::HashSet;
+
+use pax_core::{
+    normalize_doi, CandidateWork, CheckReport, CheckStatus, FetchOutcome, Paper, ProviderId,
+};
 
 pub trait Sink {
     fn message(&mut self, message: &str);
     fn error(&mut self, message: &str);
     fn provider_header(&mut self, provider: ProviderId);
-    fn candidates(&mut self, candidates: &[CandidateWork]);
+    fn candidates(&mut self, candidates: &[CandidateWork], known_dois: &HashSet<String>);
     fn candidate(&mut self, candidate: &CandidateWork);
     fn papers(&mut self, papers: &[Paper]);
     fn paper(&mut self, paper: &Paper);
@@ -33,11 +37,28 @@ impl Sink for TextSink {
         println!("{provider}:");
     }
 
-    fn candidates(&mut self, candidates: &[CandidateWork]) {
+    fn candidates(&mut self, candidates: &[CandidateWork], known_dois: &HashSet<String>) {
         for work in candidates {
-            println!("\t{}", work.title);
+            let in_library = work
+                .doi
+                .as_deref()
+                .is_some_and(|doi| known_dois.contains(normalize_doi(doi)));
+            println!(
+                "\t{}{}",
+                work.title,
+                if in_library { " [in library]" } else { "" }
+            );
             println!("\t\t{}", work.id);
+            if !work.authors.is_empty() {
+                println!("\t\t{}", work.authors.join(", "));
+            }
+            println!("\t\t{}", work.publish_date);
             println!("\t\t{}", work.doi.as_deref().unwrap_or("(no doi)"));
+            println!("\t\t{}", work.venue.as_deref().unwrap_or("(no venue)"));
+            println!(
+                "\t\tPDF: {}",
+                if work.pdf_url.is_some() { "✓" } else { "✗" }
+            );
         }
     }
 
@@ -50,9 +71,16 @@ impl Sink for TextSink {
             candidate.doi.as_deref().unwrap_or("(no doi)")
         );
         println!(
+            "Venue:      {}",
+            candidate.venue.as_deref().unwrap_or("(no venue)")
+        );
+        println!(
             "PDF source: {}",
             candidate.pdf_url.as_deref().unwrap_or("(none found)")
         );
+        if let Some(abstract_text) = &candidate.abstract_text {
+            println!("Abstract:   {abstract_text}");
+        }
         println!("Reference:  {}", candidate.id);
     }
 
@@ -79,6 +107,10 @@ impl Sink for TextSink {
             "DOI:          {}",
             paper.identity.doi.as_deref().unwrap_or("(no doi)")
         );
+        println!(
+            "Venue:        {}",
+            paper.identity.venue.as_deref().unwrap_or("(no venue)")
+        );
         println!("Citation key: {}", paper.local.citation_key);
         println!(
             "PDF source:   {}",
@@ -87,6 +119,14 @@ impl Sink for TextSink {
                 .source_url
                 .as_deref()
                 .unwrap_or("(not resolved)")
+        );
+        println!(
+            "Artifact:     {}",
+            if paper.artifact.hash.is_some() {
+                "Fetched"
+            } else {
+                "Not fetched"
+            }
         );
         if !paper.local.tags.is_empty() {
             println!("Tags:         {}", paper.local.tags.join(", "));
