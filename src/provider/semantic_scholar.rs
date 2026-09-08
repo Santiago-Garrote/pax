@@ -59,6 +59,43 @@ impl From<::semantic_scholar::Paper> for CandidateWork {
                 .collect(),
             publish_date: value.publication_date.unwrap_or_default(),
             doi: value.external_ids.as_ref().and_then(|ids| ids.doi.clone()),
+            pdf_url: value
+                .open_access_pdf
+                .as_ref()
+                .and_then(|pdf| pdf.url.clone()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::semantic_scholar::{OpenAccessPdf, Paper};
+
+    fn paper(title: &str) -> Paper {
+        Paper {
+            title: Some(title.to_string()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn pdf_url_comes_from_open_access_pdf() {
+        let mut p = paper("On Computable Numbers");
+        p.open_access_pdf = Some(OpenAccessPdf {
+            url: Some("https://example.org/turing.pdf".to_string()),
+            status: None,
+        });
+        let work = CandidateWork::from(p);
+        assert_eq!(
+            work.pdf_url.as_deref(),
+            Some("https://example.org/turing.pdf")
+        );
+    }
+
+    #[test]
+    fn pdf_url_is_none_when_not_open_access() {
+        let work = CandidateWork::from(paper("Paywalled Paper"));
+        assert_eq!(work.pdf_url, None);
     }
 }

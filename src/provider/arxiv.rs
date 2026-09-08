@@ -49,9 +49,18 @@ impl From<arxiv_client::Entry> for CandidateWork {
                 native_id: value.id.to_string(),
             },
             title: value.title,
-            authors: value.authors.into_iter().map(|author| author.name).collect(),
+            authors: value
+                .authors
+                .into_iter()
+                .map(|author| author.name)
+                .collect(),
             publish_date: value.published.to_rfc3339(),
             doi: value.doi,
+            pdf_url: value
+                .links
+                .iter()
+                .find(|link| link.title.as_deref() == Some("pdf"))
+                .map(|link| link.href.clone()),
         }
     }
 }

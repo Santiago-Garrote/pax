@@ -17,8 +17,8 @@ use std::path::Path;
 pub use error::PaxError;
 pub use library::Library;
 pub use nix::init_library;
-pub use paper::{Artifact, Identity, Local, Paper, PaperRef};
 use paper::year_from_publish_date;
+pub use paper::{Artifact, Identity, Local, Paper, PaperRef};
 pub use provider::{
     ArxivProvider, CandidateId, CandidateWork, CrossrefProvider, OpenAlexProvider, Provider,
     ProviderError, ProviderId, SemanticScholarProvider,
@@ -130,7 +130,10 @@ pub async fn add_candidate(
             authors: work.authors.clone(),
             year: year_from_publish_date(&work.publish_date),
         },
-        artifact: Artifact::default(),
+        artifact: Artifact {
+            source_url: work.pdf_url.clone(),
+            hash: None,
+        },
         local: Local {
             citation_key: citation_key.clone(),
             tags: Vec::new(),

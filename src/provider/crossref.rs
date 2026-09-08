@@ -69,6 +69,12 @@ impl From<::crossref::Work> for CandidateWork {
                 })
                 .unwrap_or_default(),
             doi: Some(value.doi),
+            pdf_url: value.link.as_ref().and_then(|links| {
+                links
+                    .iter()
+                    .find(|link| link.content_type.as_deref() == Some("application/pdf"))
+                    .map(|link| link.url.clone())
+            }),
         }
     }
 }

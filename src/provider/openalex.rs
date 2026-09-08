@@ -54,12 +54,7 @@ impl From<papers_openalex::Work> for CandidateWork {
         // `value.id` is a full URI, e.g. "https://openalex.org/W2741809807" —
         // keep just the trailing "W2741809807" as the native id, which is
         // also what `get_work` accepts.
-        let native_id = value
-            .id
-            .rsplit('/')
-            .next()
-            .unwrap_or(&value.id)
-            .to_string();
+        let native_id = value.id.rsplit('/').next().unwrap_or(&value.id).to_string();
         CandidateWork {
             id: CandidateId {
                 provider: ProviderId::OpenAlex,
@@ -76,6 +71,11 @@ impl From<papers_openalex::Work> for CandidateWork {
                 .publication_date
                 .expect("OpenAlex Paper has no publication date"),
             doi: value.doi,
+            pdf_url: value
+                .best_oa_location
+                .as_ref()
+                .and_then(|loc| loc.pdf_url.clone())
+                .or_else(|| value.open_access.as_ref().and_then(|oa| oa.oa_url.clone())),
         }
     }
 }

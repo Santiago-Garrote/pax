@@ -78,6 +78,7 @@ mod tests {
             authors: authors.iter().map(|a| a.to_string()).collect(),
             publish_date: publish_date.to_string(),
             doi: None,
+            pdf_url: None,
         }
     }
 

@@ -43,7 +43,14 @@ impl Sink for TextSink {
         println!("Title:      {}", candidate.title);
         println!("Authors:    {}", candidate.authors.join(", "));
         println!("Published:  {}", candidate.publish_date);
-        println!("DOI:        {}", candidate.doi.as_deref().unwrap_or("(no doi)"));
+        println!(
+            "DOI:        {}",
+            candidate.doi.as_deref().unwrap_or("(no doi)")
+        );
+        println!(
+            "PDF source: {}",
+            candidate.pdf_url.as_deref().unwrap_or("(none found)")
+        );
         println!("Reference:  {}", candidate.id);
     }
 
@@ -71,6 +78,14 @@ impl Sink for TextSink {
             paper.identity.doi.as_deref().unwrap_or("(no doi)")
         );
         println!("Citation key: {}", paper.local.citation_key);
+        println!(
+            "PDF source:   {}",
+            paper
+                .artifact
+                .source_url
+                .as_deref()
+                .unwrap_or("(not resolved)")
+        );
         if !paper.local.tags.is_empty() {
             println!("Tags:         {}", paper.local.tags.join(", "));
         }
