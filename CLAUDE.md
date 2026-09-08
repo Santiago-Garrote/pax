@@ -58,6 +58,8 @@ src/
 
 **`pax init`** (`nix.rs::init_library`) materializes `research/flake.nix` + an empty `research/papers.nix` from embedded templates (`include_str!` from `templates/flake.nix.template` / `templates/papers.nix.template`). The `research/` directory is gitignored; the top-level `research/flake.nix` / `research/papers.nix` checked into *this* repo are a working example of that generated structure, not the templates themselves.
 
+**A real user's research library is expected to be its own git repo** (docs/mvp.md §6: `git clone <research-library>; cd <research-library>; nix build`), and Nix flakes only evaluate files that are tracked by git — an untracked `flake.nix` fails outright with "not tracked by Git" (confirmed: this is stock Nix behavior, not a PAX bug). So in a library that's already a git repo, `research/flake.nix`/`research/papers.nix` need at least `git add` (staged, not necessarily committed) before `pax open`/any other command that calls `nix build` will work — see `docs/status.md`'s reproducibility-proof section for how this was found.
+
 ## Known gaps
 
 See `docs/status.md` for the full, kept-current checklist of implemented vs. missing
