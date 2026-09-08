@@ -41,13 +41,20 @@ it should stay accurate rather than aspirational.
 
 - [x] Title, Authors, DOI
 - [x] PDF source
-- [ ] Venue — no `venue` field exists anywhere in `Identity`
-- [ ] Abstract
-- [ ] "Whether already in library" flag on search results
-- [ ] `pax search` list view (`candidates()` in `sink.rs`) shows only title/id/doi —
-      missing authors/year/venue/PDF-availability entirely, unlike the single-item
-      `show` view
-- [ ] Nix artifact status (fetched / not fetched) on `show`
+- [x] Venue — `Identity.venue`, persisted through `papers.nix`; populated from each
+      provider (OpenAlex `primary_location.source.display_name`, Crossref
+      `container_title`, Semantic Scholar `venue`, arXiv `journal_ref` — often
+      `None` for pure preprints)
+- [x] Abstract — candidate-only (`CandidateWork.abstract_text`), not persisted to
+      `Identity`/`papers.nix` (docs/mvp.md §3's declarative format never lists it,
+      and it can be arbitrarily long)
+- [x] "Whether already in library" flag on search results — `pax_core::known_dois` +
+      `normalize_doi` (handles OpenAlex's full-URL DOI vs. the other three
+      providers' bare-DOI format), shown as `[in library]` in `search`'s list view
+- [x] `pax search` list view now shows authors/year/venue/PDF-availability
+      (✓/✗) per result, matching `show`'s richer fields
+- [x] Nix artifact status (`Fetched`/`Not fetched`) on `show` — reads
+      `paper.artifact.hash` directly, no `nix` invocation (that's `check`/`open`'s job)
 
 ## Declarative library format (docs/mvp.md §3)
 
@@ -80,10 +87,9 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 **The full docs/mvp.md §4 command surface is now implemented** — all 12 commands
 (`init`, `search`, `show`, `add`, `remove`, `list`, `edit`, `fetch`, `sync`, `check`,
-`open`, `export bibtex`) exist. What's left is no longer sequential/blocking: the DBLP
-provider, `search`/`list` filters, `edit` corrections, a few display-field gaps, and
-the full cross-machine reproducibility proof (docs/mvp.md §6) are all independent —
-pick any in any order.
+`open`, `export bibtex`) exist, and the display-field gaps are closed too. What's left
+is independent, no particular order: the DBLP provider, `search`/`list` filters,
+`edit` corrections, and the full cross-machine reproducibility proof (docs/mvp.md §6).
 
 ## Design decisions worth remembering
 
@@ -108,3 +114,8 @@ pick any in any order.
   should be instant for an already-fetched paper. `nix build` against
   `research/flake.nix` (uses the hash already recorded in `papers.nix`) reuses the
   local store with no network call at all — measured at ~0.5s.
+- **Providers don't agree on DOI format.** OpenAlex returns a full URL
+  (`"https://doi.org/10.xxxx"`); Crossref, Semantic Scholar, and arXiv all return a
+  bare DOI (`"10.xxxx"`). Any code comparing two DOIs for equality (e.g. `known_dois`'
+  "already in library" check) needs `pax_core::normalize_doi` first, or it'll silently
+  miss real matches depending on which provider each one came from.
