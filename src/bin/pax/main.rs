@@ -22,6 +22,8 @@ enum Command {
         /// A fully-qualified reference from `search`, e.g. openalex:W2072794470
         reference: String,
     },
+    ///List papers already declared in the library
+    List,
 }
 
 #[derive(Parser)]
@@ -81,6 +83,13 @@ async fn main() {
             };
             match pax_core::add_candidate(&id, Path::new(".")).await {
                 Ok(paper_ref) => sink.message(&format!("Added {}", paper_ref.0)),
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
+        Command::List => {
+            match pax_core::Library::load(&pax_core::nix::papers_path(Path::new("."))) {
+                Ok(library) if library.papers().is_empty() => sink.message("Library is empty"),
+                Ok(library) => sink.papers(library.papers()),
                 Err(e) => sink.error(&e.to_string()),
             }
         }

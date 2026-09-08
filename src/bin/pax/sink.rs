@@ -3,7 +3,7 @@
 //! output mode (e.g. JSON, for an external adapter UI) is a new `Sink` impl
 //! rather than a rewrite of every command handler.
 
-use pax_core::{CandidateWork, ProviderId};
+use pax_core::{CandidateWork, Paper, ProviderId};
 
 pub trait Sink {
     fn message(&mut self, message: &str);
@@ -11,6 +11,7 @@ pub trait Sink {
     fn provider_header(&mut self, provider: ProviderId);
     fn candidates(&mut self, candidates: &[CandidateWork]);
     fn candidate(&mut self, candidate: &CandidateWork);
+    fn papers(&mut self, papers: &[Paper]);
 }
 
 pub struct TextSink;
@@ -42,5 +43,18 @@ impl Sink for TextSink {
         println!("Published:  {}", candidate.publish_date);
         println!("DOI:        {}", candidate.doi.as_deref().unwrap_or("(no doi)"));
         println!("Reference:  {}", candidate.id);
+    }
+
+    fn papers(&mut self, papers: &[Paper]) {
+        for paper in papers {
+            println!("{}", paper.local.citation_key);
+            println!("\t{}", paper.identity.title);
+            if !paper.identity.authors.is_empty() {
+                println!("\t{}", paper.identity.authors.join(", "));
+            }
+            if let Some(year) = paper.identity.year {
+                println!("\t{}", year);
+            }
+        }
     }
 }
