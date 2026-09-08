@@ -43,6 +43,17 @@ enum Command {
         #[arg(long)]
         notes: Option<String>,
     },
+    ///Export the local library
+    Export {
+        #[command(subcommand)]
+        format: ExportFormat,
+    },
+}
+
+#[derive(Subcommand)]
+enum ExportFormat {
+    ///Export as BibTeX
+    Bibtex,
 }
 
 #[derive(Parser)]
@@ -129,5 +140,11 @@ async fn main() {
                 Err(e) => sink.error(&e.to_string()),
             }
         }
+        Command::Export {
+            format: ExportFormat::Bibtex,
+        } => match pax_core::Library::load(&pax_core::nix::papers_path(Path::new("."))) {
+            Ok(library) => sink.export(&pax_core::bibtex::render(library.papers())),
+            Err(e) => sink.error(&e.to_string()),
+        },
     }
 }

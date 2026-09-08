@@ -3,6 +3,7 @@
 //! adapter (including the `pax` binary in `src/bin/pax/`, or a future
 //! `lazypax` TUI) is a client of this library, not the other way around.
 
+pub mod bibtex;
 mod citation_key;
 pub mod error;
 pub mod library;

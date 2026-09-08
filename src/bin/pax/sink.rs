@@ -13,6 +13,7 @@ pub trait Sink {
     fn candidate(&mut self, candidate: &CandidateWork);
     fn papers(&mut self, papers: &[Paper]);
     fn paper(&mut self, paper: &Paper);
+    fn export(&mut self, bibtex: &str);
 }
 
 pub struct TextSink;
@@ -75,6 +76,12 @@ impl Sink for TextSink {
         }
         if let Some(notes) = &paper.local.notes {
             println!("Notes:        {}", notes);
+        }
+    }
+
+    fn export(&mut self, bibtex: &str) {
+        if !bibtex.is_empty() {
+            println!("{bibtex}");
         }
     }
 }
