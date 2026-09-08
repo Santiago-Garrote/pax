@@ -37,6 +37,12 @@ impl Library {
         self.papers.iter().find(|p| p.local.citation_key == citation_key)
     }
 
+    pub fn find_mut(&mut self, citation_key: &str) -> Option<&mut Paper> {
+        self.papers
+            .iter_mut()
+            .find(|p| p.local.citation_key == citation_key)
+    }
+
     pub fn remove(&mut self, citation_key: &str) -> bool {
         let len_before = self.papers.len();
         self.papers.retain(|p| p.local.citation_key != citation_key);
@@ -494,6 +500,18 @@ mod tests {
             Some("On Computable Numbers")
         );
         assert!(library.find("nonexistent-key").is_none());
+    }
+
+    #[test]
+    fn find_mut_allows_in_place_mutation() {
+        let mut library = Library::new(sample_papers());
+
+        library.find_mut("turing1936").unwrap().local.notes = Some("edited".to_string());
+        assert_eq!(
+            library.find("turing1936").unwrap().local.notes,
+            Some("edited".to_string())
+        );
+        assert!(library.find_mut("nonexistent-key").is_none());
     }
 
     #[test]

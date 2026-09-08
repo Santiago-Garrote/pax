@@ -48,6 +48,27 @@ pub(crate) fn year_from_publish_date(publish_date: &str) -> Option<i32> {
     digits.parse().ok()
 }
 
+/// Applies incremental tag add/remove and an optional notes overwrite to a
+/// paper's local metadata. Adding an already-present tag is a no-op (no
+/// duplicates); removing an absent tag is a no-op (no error) — both safe to
+/// call again.
+pub(crate) fn apply_edits(
+    local: &mut Local,
+    add_tags: &[String],
+    remove_tags: &[String],
+    notes: Option<&str>,
+) {
+    for tag in add_tags {
+        if !local.tags.contains(tag) {
+            local.tags.push(tag.clone());
+        }
+    }
+    local.tags.retain(|t| !remove_tags.contains(t));
+    if let Some(notes) = notes {
+        local.notes = Some(notes.to_string());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,5 +87,43 @@ mod tests {
         assert_eq!(year_from_publish_date(""), None);
         assert_eq!(year_from_publish_date("198"), None);
         assert_eq!(year_from_publish_date("actor model"), None);
+    }
+
+    #[test]
+    fn apply_edits_add_is_idempotent() {
+        let mut local = Local::default();
+        apply_edits(&mut local, &["a".to_string()], &[], None);
+        apply_edits(&mut local, &["a".to_string()], &[], None);
+        assert_eq!(local.tags, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn apply_edits_remove_absent_tag_is_a_no_op() {
+        let mut local = Local {
+            tags: vec!["a".to_string()],
+            ..Default::default()
+        };
+        apply_edits(&mut local, &[], &["b".to_string()], None);
+        assert_eq!(local.tags, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn apply_edits_add_and_remove_combine() {
+        let mut local = Local {
+            tags: vec!["a".to_string()],
+            ..Default::default()
+        };
+        apply_edits(&mut local, &["b".to_string()], &["a".to_string()], None);
+        assert_eq!(local.tags, vec!["b".to_string()]);
+    }
+
+    #[test]
+    fn apply_edits_overwrites_notes() {
+        let mut local = Local {
+            notes: Some("old".to_string()),
+            ..Default::default()
+        };
+        apply_edits(&mut local, &[], &[], Some("new"));
+        assert_eq!(local.notes, Some("new".to_string()));
     }
 }

@@ -16,4 +16,6 @@ pub enum PaxError {
     NotFound(String),
     #[error("no paper found with citation key {0:?}")]
     NoSuchPaper(String),
+    #[error("nothing to edit: specify --add-tag, --remove-tag, and/or --notes")]
+    NoChangesSpecified,
 }

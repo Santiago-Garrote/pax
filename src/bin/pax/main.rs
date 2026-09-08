@@ -29,6 +29,20 @@ enum Command {
         /// The paper's citation key, e.g. turing1936
         citation_key: String,
     },
+    ///Modify a declared paper's tags or notes
+    Edit {
+        /// The paper's citation key, e.g. turing1936
+        citation_key: String,
+        /// Add a tag (repeatable)
+        #[arg(long = "add-tag")]
+        add_tag: Vec<String>,
+        /// Remove a tag (repeatable)
+        #[arg(long = "remove-tag")]
+        remove_tag: Vec<String>,
+        /// Set the paper's notes
+        #[arg(long)]
+        notes: Option<String>,
+    },
 }
 
 #[derive(Parser)]
@@ -95,6 +109,23 @@ async fn main() {
         Command::Remove { citation_key } => {
             match pax_core::remove_paper(&citation_key, Path::new(".")) {
                 Ok(()) => sink.message(&format!("Removed {citation_key}")),
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
+        Command::Edit {
+            citation_key,
+            add_tag,
+            remove_tag,
+            notes,
+        } => {
+            match pax_core::edit_paper(
+                &citation_key,
+                Path::new("."),
+                &add_tag,
+                &remove_tag,
+                notes.as_deref(),
+            ) {
+                Ok(()) => sink.message(&format!("Updated {citation_key}")),
                 Err(e) => sink.error(&e.to_string()),
             }
         }

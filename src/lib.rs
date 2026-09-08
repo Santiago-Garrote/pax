@@ -163,3 +163,27 @@ pub fn remove_paper(citation_key: &str, root: &Path) -> Result<(), PaxError> {
     library.save(&path)?;
     Ok(())
 }
+
+/// Edits a declared paper's tags and/or notes. Scoped to `Local` metadata
+/// only for now — citation-key rename and Identity corrections are
+/// deferred.
+pub fn edit_paper(
+    citation_key: &str,
+    root: &Path,
+    add_tags: &[String],
+    remove_tags: &[String],
+    notes: Option<&str>,
+) -> Result<(), PaxError> {
+    if add_tags.is_empty() && remove_tags.is_empty() && notes.is_none() {
+        return Err(PaxError::NoChangesSpecified);
+    }
+
+    let path = nix::papers_path(root);
+    let mut library = Library::load(&path)?;
+    let paper = library
+        .find_mut(citation_key)
+        .ok_or_else(|| PaxError::NoSuchPaper(citation_key.to_string()))?;
+    paper::apply_edits(&mut paper.local, add_tags, remove_tags, notes);
+    library.save(&path)?;
+    Ok(())
+}
