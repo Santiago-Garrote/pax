@@ -21,8 +21,14 @@ it should stay accurate rather than aspirational.
 - [x] `pax list` — plain listing
 - [x] `pax list --author` / `--year` / `--tag` filters — combine with AND
 - [x] `pax edit <key>` — tags, notes
-- [ ] `pax edit <key>` — citation-key rename
-- [ ] `pax edit <key>` — Identity corrections (title/authors/year/doi)
+- [x] `pax edit <key>` — citation-key rename (`--rename`), validated against
+      `Library`'s own identifier grammar and checked for collisions before
+      anything is written — an unvalidated rename would corrupt `papers.nix`
+      (citation keys are unquoted Nix identifiers, not strings)
+- [x] `pax edit <key>` — Identity corrections (`--title`/`--author`/`--year`/`--doi`);
+      `--author` replaces the whole list, not incremental like tags; no way to
+      clear `year`/`doi` back to null (out of scope — see `docs/status.md` design
+      notes)
 - [x] `pax remove <key>`
 - [x] `pax fetch <key>` — materialize via `nix store prefetch-file`, write `hash`
 - [x] `pax check` — verifies every declared artifact against its recorded hash, exits
@@ -92,10 +98,9 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 **The full docs/mvp.md §4 command surface is now implemented** — all 12 commands
 (`init`, `search`, `show`, `add`, `remove`, `list`, `edit`, `fetch`, `sync`, `check`,
-`open`, `export bibtex`) exist, the display-field gaps are closed, and so are the
-`search`/`list` filters. What's left is independent, no particular order: the DBLP
-provider, `edit` corrections (citation-key rename, Identity fixes), and the full
-cross-machine reproducibility proof (docs/mvp.md §6).
+`open`, `export bibtex`) exist, and so are the display-field gaps, the `search`/`list`
+filters, and `edit`'s corrections. Two independent items remain: the DBLP provider,
+and the full cross-machine reproducibility proof (docs/mvp.md §6).
 
 ## Design decisions worth remembering
 
@@ -144,3 +149,9 @@ cross-machine reproducibility proof (docs/mvp.md §6).
   always send (e.g. an institutional/anonymous contributor with no `family` name).
   Not fixed here — out of scope for this task, noted for whoever picks up
   Crossref-related work next.
+- **Citation keys are unquoted Nix identifiers, not strings.** `write_entry`
+  (`library.rs`) writes `{key} = { ... };` with the key bare, not `"{key}"`. Any
+  code that lets a citation key be user-supplied (currently only `edit --rename`)
+  must validate it against `library::is_valid_citation_key` first, or it can write
+  a `papers.nix` that `Library::load` can no longer parse back — a self-inflicted
+  corruption with no warning until the next read.
