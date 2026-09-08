@@ -150,3 +150,16 @@ pub async fn show_reference(reference: &str, root: &Path) -> Result<ShowResult, 
     let work = resolve_candidate(&id).await?;
     Ok(ShowResult::Candidate(work))
 }
+
+/// Removes a declared paper from the local library at `root`. Only the
+/// declaration/metadata is removed — Nix remains responsible for garbage
+/// collecting any unused artifacts on its own (see docs/mvp.md).
+pub fn remove_paper(citation_key: &str, root: &Path) -> Result<(), PaxError> {
+    let path = nix::papers_path(root);
+    let mut library = Library::load(&path)?;
+    if !library.remove(citation_key) {
+        return Err(PaxError::NoSuchPaper(citation_key.to_string()));
+    }
+    library.save(&path)?;
+    Ok(())
+}

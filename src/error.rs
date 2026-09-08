@@ -14,4 +14,6 @@ pub enum PaxError {
     InvalidReference(#[from] CandidateIdParseError),
     #[error("no paper found for {0:?}: not declared locally, and not a valid candidate reference")]
     NotFound(String),
+    #[error("no paper found with citation key {0:?}")]
+    NoSuchPaper(String),
 }

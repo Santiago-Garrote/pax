@@ -37,6 +37,12 @@ impl Library {
         self.papers.iter().find(|p| p.local.citation_key == citation_key)
     }
 
+    pub fn remove(&mut self, citation_key: &str) -> bool {
+        let len_before = self.papers.len();
+        self.papers.retain(|p| p.local.citation_key != citation_key);
+        self.papers.len() != len_before
+    }
+
     pub fn load(path: &Path) -> Result<Self, PaxError> {
         let text = std::fs::read_to_string(path)?;
         let tokens = tokenize(&text)?;
@@ -488,6 +494,18 @@ mod tests {
             Some("On Computable Numbers")
         );
         assert!(library.find("nonexistent-key").is_none());
+    }
+
+    #[test]
+    fn remove_deletes_matching_paper_and_reports_whether_found() {
+        let mut library = Library::new(sample_papers());
+
+        assert!(!library.remove("nonexistent-key"));
+        assert_eq!(library.papers().len(), 2);
+
+        assert!(library.remove("turing1936"));
+        assert_eq!(library.papers().len(), 1);
+        assert!(library.find("turing1936").is_none());
     }
 
     #[test]

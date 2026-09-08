@@ -24,6 +24,11 @@ enum Command {
     },
     ///List papers already declared in the library
     List,
+    ///Remove a declared paper from the library
+    Remove {
+        /// The paper's citation key, e.g. turing1936
+        citation_key: String,
+    },
 }
 
 #[derive(Parser)]
@@ -84,6 +89,12 @@ async fn main() {
             match pax_core::Library::load(&pax_core::nix::papers_path(Path::new("."))) {
                 Ok(library) if library.papers().is_empty() => sink.message("Library is empty"),
                 Ok(library) => sink.papers(library.papers()),
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
+        Command::Remove { citation_key } => {
+            match pax_core::remove_paper(&citation_key, Path::new(".")) {
+                Ok(()) => sink.message(&format!("Removed {citation_key}")),
                 Err(e) => sink.error(&e.to_string()),
             }
         }
