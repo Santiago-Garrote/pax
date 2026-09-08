@@ -20,6 +20,16 @@ pub use provider::{
     ProviderError, ProviderId, SemanticScholarProvider,
 };
 
+// TODO(deferred): hardcoded API key, see docs/mvp.md gap list — moving this
+// to configuration is out of scope for now.
+fn semantic_scholar_provider() -> Result<SemanticScholarProvider, ProviderError> {
+    SemanticScholarProvider::new("s2k-lqEUK8qhHH5MGk6NKa76zDxmrZxXB6wPJ5uWsPJJ")
+}
+
+fn arxiv_provider() -> Result<ArxivProvider, ProviderError> {
+    ArxivProvider::new("santiagogarrote2005@gmail.com")
+}
+
 /// Searches every configured provider and aggregates results by provider.
 /// A failing provider doesn't fail the whole search — its error is reported
 /// alongside whatever providers did succeed, so callers (e.g. the CLI) can
@@ -39,9 +49,7 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
         }
     }
 
-    // TODO(deferred): hardcoded API key, see docs/mvp.md gap list — moving
-    // this to configuration is out of scope for this restructuring.
-    match SemanticScholarProvider::new("s2k-lqEUK8qhHH5MGk6NKa76zDxmrZxXB6wPJ5uWsPJJ") {
+    match semantic_scholar_provider() {
         Ok(semantic_scholar) => {
             results.insert(
                 ProviderId::SemanticScholar,
@@ -53,7 +61,7 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
         }
     }
 
-    match ArxivProvider::new("santiagogarrote2005@gmail.com") {
+    match arxiv_provider() {
         Ok(arxiv) => {
             results.insert(ProviderId::ArXiv, arxiv.search(query).await);
         }
@@ -63,4 +71,15 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
     }
 
     results
+}
+
+/// Resolves a single, already-unambiguous candidate reference by asking its
+/// provider directly for that id — no search or disambiguation involved.
+pub async fn resolve_candidate(id: &CandidateId) -> Result<CandidateWork, ProviderError> {
+    match id.provider {
+        ProviderId::OpenAlex => OpenAlexProvider::new().get(&id.native_id).await,
+        ProviderId::Crossref => CrossrefProvider::new()?.get(&id.native_id).await,
+        ProviderId::SemanticScholar => semantic_scholar_provider()?.get(&id.native_id).await,
+        ProviderId::ArXiv => arxiv_provider()?.get(&id.native_id).await,
+    }
 }

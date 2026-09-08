@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use clap::{Parser, Subcommand};
-use pax_core::ProviderId;
+use pax_core::{CandidateId, ProviderId};
 
 #[derive(Subcommand)]
 enum Command {
@@ -9,6 +9,11 @@ enum Command {
     Init,
     ///Search for papers
     Search { query: String },
+    ///Inspect a search result before adding it
+    Show {
+        /// A fully-qualified reference from `search`, e.g. openalex:W2072794470
+        reference: String,
+    },
 }
 
 #[derive(Parser)]
@@ -48,6 +53,25 @@ async fn main() {
                     Some(Err(e)) => println!("\tError: {}", e),
                     None => {}
                 }
+            }
+        }
+        Command::Show { reference } => {
+            let id: CandidateId = match reference.parse() {
+                Ok(id) => id,
+                Err(e) => {
+                    println!("Invalid reference: {}", e);
+                    return;
+                }
+            };
+            match pax_core::resolve_candidate(&id).await {
+                Ok(work) => {
+                    println!("Title:      {}", work.title);
+                    println!("Authors:    {}", work.authors.join(", "));
+                    println!("Published:  {}", work.publish_date);
+                    println!("DOI:        {}", work.doi);
+                    println!("Reference:  {}", work.id);
+                }
+                Err(e) => println!("Error: {}", e),
             }
         }
     }
