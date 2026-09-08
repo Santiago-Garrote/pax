@@ -51,7 +51,7 @@ enum Command {
         /// The paper's citation key, e.g. turing1936
         citation_key: String,
     },
-    ///Modify a declared paper's tags or notes
+    ///Modify a declared paper's tags, notes, citation key, or metadata
     Edit {
         /// The paper's citation key, e.g. turing1936
         citation_key: String,
@@ -64,6 +64,21 @@ enum Command {
         /// Set the paper's notes
         #[arg(long)]
         notes: Option<String>,
+        /// Rename the paper's citation key
+        #[arg(long)]
+        rename: Option<String>,
+        /// Correct the paper's title
+        #[arg(long)]
+        title: Option<String>,
+        /// Correct the paper's author list (repeatable; replaces the whole list)
+        #[arg(long = "author")]
+        author: Vec<String>,
+        /// Correct the paper's year
+        #[arg(long)]
+        year: Option<i32>,
+        /// Correct the paper's DOI
+        #[arg(long)]
+        doi: Option<String>,
     },
     ///Export the local library
     Export {
@@ -226,14 +241,23 @@ async fn main() {
             add_tag,
             remove_tag,
             notes,
+            rename,
+            title,
+            author,
+            year,
+            doi,
         } => {
-            match pax_core::edit_paper(
-                &citation_key,
-                Path::new("."),
-                &add_tag,
-                &remove_tag,
-                notes.as_deref(),
-            ) {
+            let edits = pax_core::PaperEdits {
+                add_tags: add_tag,
+                remove_tags: remove_tag,
+                notes,
+                rename,
+                title,
+                authors: if author.is_empty() { None } else { Some(author) },
+                year,
+                doi,
+            };
+            match pax_core::edit_paper(&citation_key, Path::new("."), &edits) {
                 Ok(()) => sink.message(&format!("Updated {citation_key}")),
                 Err(e) => sink.error(&e.to_string()),
             }

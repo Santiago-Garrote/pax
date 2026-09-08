@@ -49,15 +49,18 @@ pub(crate) fn year_from_publish_date(publish_date: &str) -> Option<i32> {
     digits.parse().ok()
 }
 
-/// Applies incremental tag add/remove and an optional notes overwrite to a
-/// paper's local metadata. Adding an already-present tag is a no-op (no
-/// duplicates); removing an absent tag is a no-op (no error) — both safe to
-/// call again.
-pub(crate) fn apply_edits(
+/// Applies incremental tag add/remove, an optional notes overwrite, and an
+/// optional citation-key rename to a paper's local metadata. Adding an
+/// already-present tag is a no-op (no duplicates); removing an absent tag is
+/// a no-op (no error) — both safe to call again. Rename validity and
+/// uniqueness are the caller's responsibility (`lib.rs::edit_paper`) — this
+/// function just performs the assignment.
+pub(crate) fn apply_local_edits(
     local: &mut Local,
     add_tags: &[String],
     remove_tags: &[String],
     notes: Option<&str>,
+    rename: Option<&str>,
 ) {
     for tag in add_tags {
         if !local.tags.contains(tag) {
@@ -67,6 +70,34 @@ pub(crate) fn apply_edits(
     local.tags.retain(|t| !remove_tags.contains(t));
     if let Some(notes) = notes {
         local.notes = Some(notes.to_string());
+    }
+    if let Some(new_key) = rename {
+        local.citation_key = new_key.to_string();
+    }
+}
+
+/// Applies explicit Identity corrections — each `Some` overwrites, `None`
+/// leaves the field untouched. `authors` is a full replace when given, not an
+/// incremental add/remove like tags: an author-list correction means the list
+/// was wrong, not that one name needs adding.
+pub(crate) fn apply_identity_corrections(
+    identity: &mut Identity,
+    title: Option<&str>,
+    authors: Option<&[String]>,
+    year: Option<i32>,
+    doi: Option<&str>,
+) {
+    if let Some(title) = title {
+        identity.title = title.to_string();
+    }
+    if let Some(authors) = authors {
+        identity.authors = authors.to_vec();
+    }
+    if let Some(year) = year {
+        identity.year = Some(year);
+    }
+    if let Some(doi) = doi {
+        identity.doi = Some(doi.to_string());
     }
 }
 
@@ -93,8 +124,8 @@ mod tests {
     #[test]
     fn apply_edits_add_is_idempotent() {
         let mut local = Local::default();
-        apply_edits(&mut local, &["a".to_string()], &[], None);
-        apply_edits(&mut local, &["a".to_string()], &[], None);
+        apply_local_edits(&mut local, &["a".to_string()], &[], None, None);
+        apply_local_edits(&mut local, &["a".to_string()], &[], None, None);
         assert_eq!(local.tags, vec!["a".to_string()]);
     }
 
@@ -104,7 +135,7 @@ mod tests {
             tags: vec!["a".to_string()],
             ..Default::default()
         };
-        apply_edits(&mut local, &[], &["b".to_string()], None);
+        apply_local_edits(&mut local, &[], &["b".to_string()], None, None);
         assert_eq!(local.tags, vec!["a".to_string()]);
     }
 
@@ -114,7 +145,7 @@ mod tests {
             tags: vec!["a".to_string()],
             ..Default::default()
         };
-        apply_edits(&mut local, &["b".to_string()], &["a".to_string()], None);
+        apply_local_edits(&mut local, &["b".to_string()], &["a".to_string()], None, None);
         assert_eq!(local.tags, vec!["b".to_string()]);
     }
 
@@ -124,7 +155,57 @@ mod tests {
             notes: Some("old".to_string()),
             ..Default::default()
         };
-        apply_edits(&mut local, &[], &[], Some("new"));
+        apply_local_edits(&mut local, &[], &[], Some("new"), None);
         assert_eq!(local.notes, Some("new".to_string()));
+    }
+
+    #[test]
+    fn apply_edits_renames_citation_key() {
+        let mut local = Local {
+            citation_key: "old2020".to_string(),
+            ..Default::default()
+        };
+        apply_local_edits(&mut local, &[], &[], None, Some("new2020"));
+        assert_eq!(local.citation_key, "new2020");
+    }
+
+    #[test]
+    fn apply_identity_corrections_overwrites_only_given_fields() {
+        let mut identity = Identity {
+            doi: Some("10.1/old".to_string()),
+            title: "Old Title".to_string(),
+            authors: vec!["Old Author".to_string()],
+            year: Some(2000),
+            venue: None,
+        };
+        apply_identity_corrections(&mut identity, Some("New Title"), None, None, None);
+        assert_eq!(identity.title, "New Title");
+        assert_eq!(identity.authors, vec!["Old Author".to_string()]);
+        assert_eq!(identity.year, Some(2000));
+        assert_eq!(identity.doi, Some("10.1/old".to_string()));
+    }
+
+    #[test]
+    fn apply_identity_corrections_replaces_whole_author_list() {
+        let mut identity = Identity {
+            authors: vec!["A".to_string(), "B".to_string()],
+            ..Default::default()
+        };
+        apply_identity_corrections(&mut identity, None, Some(&["C".to_string()]), None, None);
+        assert_eq!(identity.authors, vec!["C".to_string()]);
+    }
+
+    #[test]
+    fn apply_identity_corrections_is_a_no_op_with_all_none() {
+        let original = Identity {
+            doi: Some("10.1/x".to_string()),
+            title: "T".to_string(),
+            authors: vec!["A".to_string()],
+            year: Some(1999),
+            venue: Some("V".to_string()),
+        };
+        let mut identity = original.clone();
+        apply_identity_corrections(&mut identity, None, None, None, None);
+        assert_eq!(identity, original);
     }
 }

@@ -16,10 +16,20 @@ pub enum PaxError {
     NotFound(String),
     #[error("no paper found with citation key {0:?}")]
     NoSuchPaper(String),
-    #[error("nothing to edit: specify --add-tag, --remove-tag, and/or --notes")]
+    #[error(
+        "nothing to edit: specify --add-tag, --remove-tag, --notes, --rename, --title, \
+         --author, --year, and/or --doi"
+    )]
     NoChangesSpecified,
     #[error("no PDF source recorded for {0:?}; nothing to fetch")]
     NoSourceUrl(String),
     #[error("fetch failed: {0}")]
     Fetch(String),
+    #[error("citation key {0:?} is already in use")]
+    CitationKeyExists(String),
+    #[error(
+        "{0:?} is not a valid citation key (must start with a letter or underscore, and \
+         contain only letters, digits, underscores, and hyphens)"
+    )]
+    InvalidCitationKey(String),
 }

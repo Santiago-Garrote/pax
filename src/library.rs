@@ -75,6 +75,16 @@ impl Library {
     }
 }
 
+/// Whether `key` is a valid citation key per this file's own tokenizer grammar
+/// — `(alpha|_)(alnum|_|-)*`. Citation keys are written as bare Nix attribute
+/// names (see `write_entry`), not quoted strings, so an invalid one would
+/// produce a `papers.nix` this same file can no longer parse back.
+pub(crate) fn is_valid_citation_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    matches!(chars.next(), Some(c) if c.is_alphabetic() || c == '_')
+        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+}
+
 fn write_entry(out: &mut String, paper: &Paper) {
     let _ = writeln!(out, "  {} = {{", paper.local.citation_key);
     write_field_string_opt(out, "doi", paper.identity.doi.as_deref());
@@ -473,6 +483,21 @@ mod tests {
                 },
             },
         ]
+    }
+
+    #[test]
+    fn is_valid_citation_key_accepts_tokenizer_identifiers() {
+        assert!(is_valid_citation_key("turing1936"));
+        assert!(is_valid_citation_key("_foo"));
+        assert!(is_valid_citation_key("a-b_c"));
+    }
+
+    #[test]
+    fn is_valid_citation_key_rejects_non_identifiers() {
+        assert!(!is_valid_citation_key(""));
+        assert!(!is_valid_citation_key("1abc"));
+        assert!(!is_valid_citation_key("has space"));
+        assert!(!is_valid_citation_key("\"quoted\""));
     }
 
     #[test]

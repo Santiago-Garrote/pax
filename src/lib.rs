@@ -580,28 +580,193 @@ pub fn remove_paper(citation_key: &str, root: &Path) -> Result<(), PaxError> {
     Ok(())
 }
 
-/// Edits a declared paper's tags and/or notes. Scoped to `Local` metadata
-/// only for now — citation-key rename and Identity corrections are
-/// deferred.
-pub fn edit_paper(
-    citation_key: &str,
-    root: &Path,
-    add_tags: &[String],
-    remove_tags: &[String],
-    notes: Option<&str>,
-) -> Result<(), PaxError> {
-    if add_tags.is_empty() && remove_tags.is_empty() && notes.is_none() {
+/// What to change about a declared paper, passed to [`edit_paper`]. Every
+/// field is opt-in — only a field that's `Some`/non-empty gets touched,
+/// matching docs/mvp.md §2.10: "the original external metadata should not be
+/// silently overwritten without user intent."
+#[derive(Debug, Clone, Default)]
+pub struct PaperEdits {
+    pub add_tags: Vec<String>,
+    pub remove_tags: Vec<String>,
+    pub notes: Option<String>,
+    pub rename: Option<String>,
+    pub title: Option<String>,
+    /// A full replacement of the author list when given — not incremental
+    /// add/remove like tags, since an author-list correction means the list
+    /// was wrong, not that one name needs adding.
+    pub authors: Option<Vec<String>>,
+    pub year: Option<i32>,
+    pub doi: Option<String>,
+}
+
+impl PaperEdits {
+    fn is_empty(&self) -> bool {
+        self.add_tags.is_empty()
+            && self.remove_tags.is_empty()
+            && self.notes.is_none()
+            && self.rename.is_none()
+            && self.title.is_none()
+            && self.authors.is_none()
+            && self.year.is_none()
+            && self.doi.is_none()
+    }
+}
+
+/// Edits a declared paper: tags, notes, citation-key rename, and Identity
+/// corrections (title/authors/year/doi). A rename is checked for validity
+/// (`library::is_valid_citation_key` — citation keys are unquoted Nix
+/// identifiers, so an invalid one would corrupt `papers.nix`) and for
+/// collision against every other declared paper before anything is written.
+pub fn edit_paper(citation_key: &str, root: &Path, edits: &PaperEdits) -> Result<(), PaxError> {
+    if edits.is_empty() {
         return Err(PaxError::NoChangesSpecified);
+    }
+    if let Some(new_key) = &edits.rename
+        && !library::is_valid_citation_key(new_key)
+    {
+        return Err(PaxError::InvalidCitationKey(new_key.clone()));
     }
 
     let path = nix::papers_path(root);
     let mut library = Library::load(&path)?;
+
+    if let Some(new_key) = &edits.rename
+        && new_key != citation_key
+        && library.find(new_key).is_some()
+    {
+        return Err(PaxError::CitationKeyExists(new_key.clone()));
+    }
+
     let paper = library
         .find_mut(citation_key)
         .ok_or_else(|| PaxError::NoSuchPaper(citation_key.to_string()))?;
-    paper::apply_edits(&mut paper.local, add_tags, remove_tags, notes);
+    paper::apply_local_edits(
+        &mut paper.local,
+        &edits.add_tags,
+        &edits.remove_tags,
+        edits.notes.as_deref(),
+        edits.rename.as_deref(),
+    );
+    paper::apply_identity_corrections(
+        &mut paper.identity,
+        edits.title.as_deref(),
+        edits.authors.as_deref(),
+        edits.year,
+        edits.doi.as_deref(),
+    );
     library.save(&path)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod edit_paper_tests {
+    use super::*;
+    use std::fs;
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("pax-edit-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("research")).unwrap();
+        dir
+    }
+
+    fn two_papers_fixture() -> &'static str {
+        r#"{
+  turing1936 = {
+    doi = null;
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    venue = null;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+  hewitt1973 = {
+    doi = null;
+    title = "A Universal Modular Actor Formalism";
+    authors = [ "Carl Hewitt" ];
+    year = 1973;
+    venue = null;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+}
+"#
+    }
+
+    #[test]
+    fn rename_to_an_existing_key_is_rejected() {
+        let root = scratch_dir("rename-collision");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+
+        let result = edit_paper(
+            "turing1936",
+            &root,
+            &PaperEdits {
+                rename: Some("hewitt1973".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(result, Err(PaxError::CitationKeyExists(_))));
+
+        // Untouched: still parses, and both original keys still resolve.
+        let library = Library::load(&nix::papers_path(&root)).unwrap();
+        assert!(library.find("turing1936").is_some());
+        assert!(library.find("hewitt1973").is_some());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn rename_to_an_invalid_key_is_rejected_without_touching_the_file() {
+        let root = scratch_dir("rename-invalid");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+
+        let result = edit_paper(
+            "turing1936",
+            &root,
+            &PaperEdits {
+                rename: Some("bad key".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(result, Err(PaxError::InvalidCitationKey(_))));
+        assert!(Library::load(&nix::papers_path(&root)).unwrap().find("turing1936").is_some());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn rename_succeeds_and_persists() {
+        let root = scratch_dir("rename-success");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+
+        edit_paper(
+            "turing1936",
+            &root,
+            &PaperEdits {
+                rename: Some("turing36".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let library = Library::load(&nix::papers_path(&root)).unwrap();
+        assert!(library.find("turing1936").is_none());
+        assert!(library.find("turing36").is_some());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn no_edits_specified_is_an_error() {
+        let root = scratch_dir("no-edits");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+        let result = edit_paper("turing1936", &root, &PaperEdits::default());
+        assert!(matches!(result, Err(PaxError::NoChangesSpecified)));
+        fs::remove_dir_all(&root).unwrap();
+    }
 }
 
 /// The result of `fetch_paper`: whether an artifact was newly materialized or
