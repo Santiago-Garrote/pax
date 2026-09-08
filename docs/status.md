@@ -23,7 +23,9 @@ it should stay accurate rather than aspirational.
 - [x] `pax check` — verifies every declared artifact against its recorded hash, exits
       non-zero on any mismatch/error, without writing or materializing anything
 - [ ] `pax sync` — reconcile `research/` against `papers.nix`
-- [ ] `pax open <key>` — launch configured PDF viewer, prompt-to-fetch if not materialized
+- [x] `pax open <key>` — resolves via `nix build` on `research/flake.nix` and launches
+      `$PAX_PDF_VIEWER` (default `xdg-open`); fetches automatically if not yet
+      materialized (deliberately no interactive prompt — see below)
 - [x] `pax export bibtex`
 
 ## Providers
@@ -75,7 +77,31 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 ## Critical path
 
-`fetch` and `check` are done, both built on `nix::prefetch_file` — `sync` and `open` are
-next. Everything else on this list is a smaller, independent gap (DBLP, display fields,
-filters, local search, edit corrections) that doesn't block or get blocked by anything
-else.
+`fetch`, `check`, and `open` are all done — `sync` is the only piece left on the
+docs/mvp.md §4 command surface. Everything else on this list is a smaller, independent
+gap (DBLP, display fields, filters, local search, edit corrections) that doesn't block
+or get blocked by anything else.
+
+## Design decisions worth remembering
+
+- **`open` never prompts interactively.** docs/mvp.md §2.11 suggests a `Fetch now?
+  [y/N]` confirmation, but this codebase already has a standing precedent against
+  interactive stdin capture (`CandidateId` exists specifically so `add`/`show` never
+  need to ask "which one did you mean?" — see `CLAUDE.md`'s "Reference types"
+  section). A manual "go run `pax fetch` yourself" redirect has the same problem in a
+  different shape — still a forced, decoupled second step. `open` instead calls
+  `fetch` automatically and silently when a paper isn't materialized yet (docs/mvp.md
+  §2.5 explicitly allows this as an alternative). Only a genuinely unrecoverable case
+  — no `source_url` at all — is a hard error.
+- **`nix build` needs `--no-link`.** Without it, every `pax open`/any future
+  Nix-build-based command drops a `./result` symlink in the caller's CWD. Confirmed
+  this leaking into this repo's own root during development (harmless — `result/` is
+  gitignored — but worth remembering for any future code that shells out to `nix
+  build`).
+- **`nix store prefetch-file` vs. `nix build` are not interchangeable.**
+  `prefetch-file` (what `fetch`/`check` use) always re-hits the network to discover
+  the *current* hash — measured at ~11s even when the file's already in the local
+  store, which is correct for freshness-checking but far too slow for `open`, which
+  should be instant for an already-fetched paper. `nix build` against
+  `research/flake.nix` (uses the hash already recorded in `papers.nix`) reuses the
+  local store with no network call at all — measured at ~0.5s.
