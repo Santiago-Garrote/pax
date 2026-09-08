@@ -65,7 +65,7 @@ The MVP should initially support only a small number of reliable providers:
 - Crossref — DOI resolution and canonical bibliographic metadata.
 - Semantic Scholar — academic discovery, citations, references, and related papers.
 - arXiv — preprints and papers, particularly for computer science, mathematics, and physics.
-- DBLP — specialized computer-science bibliography and metadata.
+- DBLP — specialized computer-science bibliography and metadata. (will need client implementation)
 
 These providers should be implemented behind a common PAX discovery interface so that adding providers later does not require changing the CLI or paper model.
 
@@ -189,7 +189,7 @@ pax sync
 
 #### `pax fetch`
 
-Materialize declared papers through Nix.
+Materialize declared papers through Nix. (implemented — shells out to `nix store prefetch-file`)
 
 #### `pax check`
 
