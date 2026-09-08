@@ -7,7 +7,7 @@ pub struct ArxivProvider {
 }
 
 impl ArxivProvider {
-    pub fn new(contact: &str) -> Result<Self, ProviderError> {
+    pub fn new(contact: Option<&str>) -> Result<Self, ProviderError> {
         let client = Arxiv::builder()
             .contact(contact)
             .build()

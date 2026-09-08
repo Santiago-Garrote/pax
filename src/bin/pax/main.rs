@@ -68,6 +68,10 @@ async fn main() {
     dotenvy::dotenv().ok();
     let cli = Cli::parse();
     let mut sink = TextSink;
+    let config = pax_core::Config {
+        semantic_scholar_api_key: std::env::var("SEMANTIC_SCHOLAR_API_KEY").ok(),
+        arxiv_contact: std::env::var("ARXIV_CONTACT").ok(),
+    };
 
     match cli.command {
         Command::Init => match pax_core::init_library(Path::new(".")) {
@@ -75,7 +79,7 @@ async fn main() {
             Err(e) => sink.error(&e.to_string()),
         },
         Command::Search { query } => {
-            let results = pax_core::search_all(&query).await;
+            let results = pax_core::search_all(&query, &config).await;
             for provider in [
                 ProviderId::OpenAlex,
                 ProviderId::Crossref,
@@ -91,7 +95,7 @@ async fn main() {
             }
         }
         Command::Show { reference } => {
-            match pax_core::show_reference(&reference, Path::new(".")).await {
+            match pax_core::show_reference(&reference, Path::new("."), &config).await {
                 Ok(pax_core::ShowResult::Declared(paper)) => sink.paper(&paper),
                 Ok(pax_core::ShowResult::Candidate(work)) => sink.candidate(&work),
                 Err(e) => sink.error(&e.to_string()),
@@ -105,7 +109,7 @@ async fn main() {
                     return;
                 }
             };
-            match pax_core::add_candidate(&id, Path::new(".")).await {
+            match pax_core::add_candidate(&id, Path::new("."), &config).await {
                 Ok(paper_ref) => sink.message(&format!("Added {}", paper_ref.0)),
                 Err(e) => sink.error(&e.to_string()),
             }

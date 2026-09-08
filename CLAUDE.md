@@ -17,7 +17,7 @@ Intended workflow: `Search → Select → Declare → Fetch → Manage → Repro
 
 The project uses Nix + direnv for the dev shell (`flake.nix`, `.envrc`). `.envrc` does `use flake`, so `direnv allow` sets up a shell with cargo/rustc/rustfmt/clippy/rust-analyzer and the OpenSSL env vars (`PKG_CONFIG_PATH`, `OPENSSL_DIR`) needed to build the native TLS dependencies.
 
-Secrets/config load via `dotenvy` from `.env` at startup, but only in the `pax` binary (`dotenvy::dotenv().ok()` in `src/bin/pax.rs`'s `main()`) — the library itself never reads the environment directly.
+Secrets/config load via `dotenvy` from `.env` at startup, but only in the `pax` binary (`dotenvy::dotenv().ok()` in `src/bin/pax/main.rs`'s `main()`) — the library itself never reads the environment directly; it's passed a `pax_core::Config` instead. Recognized vars: `SEMANTIC_SCHOLAR_API_KEY` (Semantic Scholar falls back to unauthenticated requests if unset) and `ARXIV_CONTACT` (arXiv's contact-email etiquette header, omitted if unset).
 
 ## Commands
 
@@ -50,7 +50,7 @@ src/
 - **`CandidateId`** (`provider/mod.rs`) — a fully-qualified `provider:native_id` reference (e.g. `openalex:W2741809807`, `arxiv:2301.01234`) to a single, unresolved search hit. Its `FromStr` impl is deliberately strict: it rejects a bare DOI, a title, or free text (see `provider::tests` for the exact rejected/accepted cases). This makes "search returned two results, which one did you mean?" structurally impossible at the `add`/`show` argument boundary — disambiguation is `search`'s job (it already returns a list); `add`/`show` only ever accept a reference that is already unambiguous.
 - **`PaperRef`** (`paper.rs`) — a citation key (e.g. `turing1936`) addressing the closed set of papers already declared in the local library. Used by `remove`/`edit`/`open`/`fetch` (not yet implemented).
 
-**`Provider` trait** (`provider/mod.rs`) — `fn id()`, `async fn search(query)`, `async fn get(native_id)`. One implementation per provider module (`openalex.rs`, `crossref.rs`, `semantic_scholar.rs`, `arxiv.rs`), each also providing `From<ProviderNativeType> for CandidateWork`. `get()` is implemented for all four today (`OpenAlexClient::get_work`, `Crossref::work`, `SemanticScholar::get_paper`, `Arxiv::entry`), though nothing calls it yet since `add`/`show` don't exist. Note: the Semantic Scholar API key is still hardcoded in `lib.rs::search_all` (pre-existing issue, not yet fixed — see the `TODO(deferred)` comment there).
+**`Provider` trait** (`provider/mod.rs`) — `fn id()`, `async fn search(query)`, `async fn get(native_id)`. One implementation per provider module (`openalex.rs`, `crossref.rs`, `semantic_scholar.rs`, `arxiv.rs`), each also providing `From<ProviderNativeType> for CandidateWork`. `get()` is implemented for all four today (`OpenAlexClient::get_work`, `Crossref::work`, `SemanticScholar::get_paper`, `Arxiv::entry`).
 
 **`pax::search_all(query)`** fans out to all four providers concurrently-in-sequence (awaited one after another, not via `join!`) and returns `HashMap<ProviderId, Result<Vec<CandidateWork>, ProviderError>>` — a failing provider doesn't fail the whole search, and the *caller* (the CLI) decides how to display an error, since the library itself never prints.
 

@@ -7,9 +7,12 @@ pub struct SemanticScholarProvider {
 }
 
 impl SemanticScholarProvider {
-    pub fn new(api_key: &str) -> Result<Self, ProviderError> {
-        let client = SemanticScholar::with_api_key(api_key)
-            .map_err(|e| ProviderError::Request(e.to_string()))?;
+    pub fn new(api_key: Option<&str>) -> Result<Self, ProviderError> {
+        let client = match api_key {
+            Some(key) => SemanticScholar::with_api_key(key),
+            None => SemanticScholar::new(),
+        }
+        .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(SemanticScholarProvider { client })
     }
 }

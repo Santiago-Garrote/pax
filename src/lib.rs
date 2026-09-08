@@ -24,21 +24,25 @@ pub use provider::{
     ProviderError, ProviderId, SemanticScholarProvider,
 };
 
-// TODO(deferred): hardcoded API key, see docs/mvp.md gap list — moving this
-// to configuration is out of scope for now.
-fn semantic_scholar_provider() -> Result<SemanticScholarProvider, ProviderError> {
-    SemanticScholarProvider::new("s2k-lqEUK8qhHH5MGk6NKa76zDxmrZxXB6wPJ5uWsPJJ")
-}
-
-fn arxiv_provider() -> Result<ArxivProvider, ProviderError> {
-    ArxivProvider::new("santiagogarrote2005@gmail.com")
+/// Per-installation settings a caller (e.g. the CLI, reading `.env`) supplies
+/// so `pax-core` never reads the environment itself. Both fields are
+/// optional: a missing Semantic Scholar key falls back to unauthenticated
+/// requests, and a missing arXiv contact just omits it from the outgoing
+/// User-Agent — neither is a hard requirement of the underlying APIs.
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    pub semantic_scholar_api_key: Option<String>,
+    pub arxiv_contact: Option<String>,
 }
 
 /// Searches every configured provider and aggregates results by provider.
 /// A failing provider doesn't fail the whole search — its error is reported
 /// alongside whatever providers did succeed, so callers (e.g. the CLI) can
 /// decide how to surface it.
-pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<CandidateWork>, ProviderError>> {
+pub async fn search_all(
+    query: &str,
+    config: &Config,
+) -> HashMap<ProviderId, Result<Vec<CandidateWork>, ProviderError>> {
     let mut results = HashMap::new();
 
     let openalex = OpenAlexProvider::new();
@@ -53,7 +57,7 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
         }
     }
 
-    match semantic_scholar_provider() {
+    match SemanticScholarProvider::new(config.semantic_scholar_api_key.as_deref()) {
         Ok(semantic_scholar) => {
             results.insert(
                 ProviderId::SemanticScholar,
@@ -65,7 +69,7 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
         }
     }
 
-    match arxiv_provider() {
+    match ArxivProvider::new(config.arxiv_contact.as_deref()) {
         Ok(arxiv) => {
             results.insert(ProviderId::ArXiv, arxiv.search(query).await);
         }
@@ -79,12 +83,23 @@ pub async fn search_all(query: &str) -> HashMap<ProviderId, Result<Vec<Candidate
 
 /// Resolves a single, already-unambiguous candidate reference by asking its
 /// provider directly for that id — no search or disambiguation involved.
-pub async fn resolve_candidate(id: &CandidateId) -> Result<CandidateWork, ProviderError> {
+pub async fn resolve_candidate(
+    id: &CandidateId,
+    config: &Config,
+) -> Result<CandidateWork, ProviderError> {
     match id.provider {
         ProviderId::OpenAlex => OpenAlexProvider::new().get(&id.native_id).await,
         ProviderId::Crossref => CrossrefProvider::new()?.get(&id.native_id).await,
-        ProviderId::SemanticScholar => semantic_scholar_provider()?.get(&id.native_id).await,
-        ProviderId::ArXiv => arxiv_provider()?.get(&id.native_id).await,
+        ProviderId::SemanticScholar => {
+            SemanticScholarProvider::new(config.semantic_scholar_api_key.as_deref())?
+                .get(&id.native_id)
+                .await
+        }
+        ProviderId::ArXiv => {
+            ArxivProvider::new(config.arxiv_contact.as_deref())?
+                .get(&id.native_id)
+                .await
+        }
     }
 }
 
@@ -92,8 +107,12 @@ pub async fn resolve_candidate(id: &CandidateId) -> Result<CandidateWork, Provid
 /// (`research/papers.nix`) — metadata only. `Artifact.source_url`/`hash`
 /// stay unset; fetching bytes and computing a Nix hash is `fetch`'s job,
 /// not `add`'s (lazy materialization, see docs/mvp.md).
-pub async fn add_candidate(id: &CandidateId, root: &Path) -> Result<PaperRef, PaxError> {
-    let work = resolve_candidate(id).await?;
+pub async fn add_candidate(
+    id: &CandidateId,
+    root: &Path,
+    config: &Config,
+) -> Result<PaperRef, PaxError> {
+    let work = resolve_candidate(id, config).await?;
     let path = nix::papers_path(root);
     let mut library = Library::load(&path)?;
 
@@ -136,7 +155,11 @@ pub enum ShowResult {
 /// `citation_key::generate`, never does — so the colon's presence decides
 /// which address space `reference` belongs to before either lookup is
 /// attempted, rather than trying one and falling back to the other.
-pub async fn show_reference(reference: &str, root: &Path) -> Result<ShowResult, PaxError> {
+pub async fn show_reference(
+    reference: &str,
+    root: &Path,
+    config: &Config,
+) -> Result<ShowResult, PaxError> {
     if !reference.contains(':') {
         let path = nix::papers_path(root);
         if let Ok(library) = Library::load(&path)
@@ -148,7 +171,7 @@ pub async fn show_reference(reference: &str, root: &Path) -> Result<ShowResult, 
     }
 
     let id: CandidateId = reference.parse()?;
-    let work = resolve_candidate(&id).await?;
+    let work = resolve_candidate(&id, config).await?;
     Ok(ShowResult::Candidate(work))
 }
 
