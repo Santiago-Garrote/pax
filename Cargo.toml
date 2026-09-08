@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "pax"
-path = "src/bin/pax.rs"
+path = "src/bin/pax/main.rs"
 required-features = ["cli"]
 
 [features]

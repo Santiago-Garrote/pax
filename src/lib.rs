@@ -1,6 +1,6 @@
 //! `pax-core`: the paper-discovery, declaration, and library domain logic for
 //! PAX. This is the primary artifact of this repository — any CLI or other
-//! adapter (including the `pax` binary in `src/bin/pax.rs`, or a future
+//! adapter (including the `pax` binary in `src/bin/pax/`, or a future
 //! `lazypax` TUI) is a client of this library, not the other way around.
 
 pub mod error;
