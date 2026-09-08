@@ -60,6 +60,8 @@ enum Command {
         /// The paper's citation key, e.g. turing1936
         citation_key: String,
     },
+    ///Materialize every declared paper that isn't fetched yet
+    Sync,
 }
 
 #[derive(Subcommand)]
@@ -216,5 +218,21 @@ async fn main() {
                 Err(e) => sink.error(&e.to_string()),
             }
         }
+        Command::Sync => match pax_core::sync_library(Path::new(".")) {
+            Ok(reports) if reports.is_empty() => sink.message("Library is empty"),
+            Ok(reports) => {
+                let failed = reports.iter().any(|r| r.result.is_err());
+                for report in &reports {
+                    match &report.result {
+                        Ok(outcome) => sink.fetched(&report.citation_key, outcome),
+                        Err(e) => sink.error(&format!("{}: {e}", report.citation_key)),
+                    }
+                }
+                if failed {
+                    std::process::exit(1);
+                }
+            }
+            Err(e) => sink.error(&e.to_string()),
+        },
     }
 }

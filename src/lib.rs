@@ -248,6 +248,136 @@ pub fn fetch_paper(citation_key: &str, root: &Path) -> Result<FetchOutcome, PaxE
     Ok(FetchOutcome::Fetched { hash })
 }
 
+pub struct SyncReport {
+    pub citation_key: String,
+    pub result: Result<FetchOutcome, PaxError>,
+}
+
+/// Materializes every declared paper that doesn't have a hash yet, by
+/// calling `fetch_paper` once per citation key — batch `fetch`, not a
+/// distinct fetching mechanism. One paper's failure (network error, no
+/// `source_url`) doesn't stop the rest, mirroring `check_library`'s
+/// per-paper error isolation.
+pub fn sync_library(root: &Path) -> Result<Vec<SyncReport>, PaxError> {
+    let path = nix::papers_path(root);
+    let library = Library::load(&path)?;
+    let keys: Vec<String> = library
+        .papers()
+        .iter()
+        .map(|p| p.local.citation_key.clone())
+        .collect();
+    Ok(keys
+        .into_iter()
+        .map(|citation_key| {
+            let result = fetch_paper(&citation_key, root);
+            SyncReport {
+                citation_key,
+                result,
+            }
+        })
+        .collect())
+}
+
+#[cfg(test)]
+mod sync_tests {
+    use super::*;
+    use std::fs;
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("pax-sync-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("research")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn empty_library_syncs_to_an_empty_report() {
+        let root = scratch_dir("empty");
+        fs::write(nix::papers_path(&root), "{\n}\n").unwrap();
+
+        let reports = sync_library(&root).unwrap();
+        assert!(reports.is_empty());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn already_fetched_papers_are_reported_without_touching_nix() {
+        let root = scratch_dir("already-fetched");
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  turing1936 = {
+    doi = null;
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    source_url = "https://example.org/turing.pdf";
+    hash = "sha256-abc123";
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        let reports = sync_library(&root).unwrap();
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0].citation_key, "turing1936");
+        match &reports[0].result {
+            Ok(FetchOutcome::AlreadyFetched { hash }) => assert_eq!(hash, "sha256-abc123"),
+            _ => panic!("expected AlreadyFetched, got a different result"),
+        }
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn paper_with_no_source_url_reports_an_error_without_stopping_others() {
+        let root = scratch_dir("no-source");
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  noSource = {
+    doi = null;
+    title = "No Source Paper";
+    authors = [ ];
+    year = null;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+  alreadyFetched = {
+    doi = null;
+    title = "Already Fetched Paper";
+    authors = [ ];
+    year = null;
+    source_url = "https://example.org/paper.pdf";
+    hash = "sha256-def456";
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        let reports = sync_library(&root).unwrap();
+        assert_eq!(reports.len(), 2);
+        let no_source = reports.iter().find(|r| r.citation_key == "noSource").unwrap();
+        assert!(matches!(no_source.result, Err(PaxError::NoSourceUrl(_))));
+        let already_fetched = reports
+            .iter()
+            .find(|r| r.citation_key == "alreadyFetched")
+            .unwrap();
+        assert!(matches!(
+            already_fetched.result,
+            Ok(FetchOutcome::AlreadyFetched { .. })
+        ));
+        fs::remove_dir_all(&root).unwrap();
+    }
+}
+
 /// The outcome of checking a single declared paper against `nix`.
 pub enum CheckStatus {
     /// No hash recorded yet — `fetch` hasn't run for this paper.
