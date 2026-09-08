@@ -29,6 +29,10 @@ impl Library {
         &self.papers
     }
 
+    pub fn insert(&mut self, paper: Paper) {
+        self.papers.push(paper);
+    }
+
     pub fn load(path: &Path) -> Result<Self, PaxError> {
         let text = std::fs::read_to_string(path)?;
         let tokens = tokenize(&text)?;

@@ -17,6 +17,11 @@ enum Command {
         /// A fully-qualified reference from `search`, e.g. openalex:W2072794470
         reference: String,
     },
+    ///Declare a search result in the local library
+    Add {
+        /// A fully-qualified reference from `search`, e.g. openalex:W2072794470
+        reference: String,
+    },
 }
 
 #[derive(Parser)]
@@ -63,6 +68,19 @@ async fn main() {
             };
             match pax_core::resolve_candidate(&id).await {
                 Ok(work) => sink.candidate(&work),
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
+        Command::Add { reference } => {
+            let id: CandidateId = match reference.parse() {
+                Ok(id) => id,
+                Err(e) => {
+                    sink.error(&e.to_string());
+                    return;
+                }
+            };
+            match pax_core::add_candidate(&id, Path::new(".")).await {
+                Ok(paper_ref) => sink.message(&format!("Added {}", paper_ref.0)),
                 Err(e) => sink.error(&e.to_string()),
             }
         }

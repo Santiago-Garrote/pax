@@ -55,7 +55,7 @@ impl From<::semantic_scholar::Paper> for CandidateWork {
                 .filter_map(|author| author.name)
                 .collect(),
             publish_date: value.publication_date.unwrap_or_default(),
-            doi: value.paper_id,
+            doi: value.external_ids.as_ref().and_then(|ids| ids.doi.clone()),
         }
     }
 }

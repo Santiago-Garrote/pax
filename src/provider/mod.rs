@@ -112,7 +112,7 @@ pub struct CandidateWork {
     pub title: String,
     pub authors: Vec<String>,
     pub publish_date: String,
-    pub doi: String,
+    pub doi: Option<String>,
 }
 
 #[derive(Debug, Error)]

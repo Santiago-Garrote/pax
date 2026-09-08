@@ -51,7 +51,7 @@ impl From<arxiv_client::Entry> for CandidateWork {
             title: value.title,
             authors: value.authors.into_iter().map(|author| author.name).collect(),
             publish_date: value.published.to_rfc3339(),
-            doi: value.doi.unwrap_or(String::from("NoN")),
+            doi: value.doi,
         }
     }
 }

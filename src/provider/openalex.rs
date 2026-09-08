@@ -75,7 +75,7 @@ impl From<papers_openalex::Work> for CandidateWork {
             publish_date: value
                 .publication_date
                 .expect("OpenAlex Paper has no publication date"),
-            doi: value.doi.unwrap_or(String::from("NoN")),
+            doi: value.doi,
         }
     }
 }

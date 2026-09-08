@@ -35,3 +35,36 @@ pub struct Paper {
     pub artifact: Artifact,
     pub local: Local,
 }
+
+/// Extracts a year from a provider's `publish_date`, whose format varies
+/// (`"1986-01-01"`, an RFC3339 timestamp, or a possibly-empty Crossref
+/// string) — takes the leading 4 characters and requires they parse as a
+/// plausible year.
+pub(crate) fn year_from_publish_date(publish_date: &str) -> Option<i32> {
+    let digits: String = publish_date.chars().take(4).collect();
+    if digits.len() != 4 {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn year_from_publish_date_parses_leading_digits() {
+        assert_eq!(year_from_publish_date("1986-01-01"), Some(1986));
+        assert_eq!(
+            year_from_publish_date("2022-03-23T14:33:15+00:00"),
+            Some(2022)
+        );
+    }
+
+    #[test]
+    fn year_from_publish_date_rejects_short_or_non_numeric() {
+        assert_eq!(year_from_publish_date(""), None);
+        assert_eq!(year_from_publish_date("198"), None);
+        assert_eq!(year_from_publish_date("actor model"), None);
+    }
+}

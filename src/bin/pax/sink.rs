@@ -32,7 +32,7 @@ impl Sink for TextSink {
         for work in candidates {
             println!("\t{}", work.title);
             println!("\t\t{}", work.id);
-            println!("\t\t{}", work.doi);
+            println!("\t\t{}", work.doi.as_deref().unwrap_or("(no doi)"));
         }
     }
 
@@ -40,7 +40,7 @@ impl Sink for TextSink {
         println!("Title:      {}", candidate.title);
         println!("Authors:    {}", candidate.authors.join(", "));
         println!("Published:  {}", candidate.publish_date);
-        println!("DOI:        {}", candidate.doi);
+        println!("DOI:        {}", candidate.doi.as_deref().unwrap_or("(no doi)"));
         println!("Reference:  {}", candidate.id);
     }
 }

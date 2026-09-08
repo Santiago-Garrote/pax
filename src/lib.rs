@@ -3,6 +3,7 @@
 //! adapter (including the `pax` binary in `src/bin/pax/`, or a future
 //! `lazypax` TUI) is a client of this library, not the other way around.
 
+mod citation_key;
 pub mod error;
 pub mod library;
 pub mod nix;
@@ -10,11 +11,13 @@ pub mod paper;
 pub mod provider;
 
 use std::collections::HashMap;
+use std::path::Path;
 
 pub use error::PaxError;
 pub use library::Library;
 pub use nix::init_library;
 pub use paper::{Artifact, Identity, Local, Paper, PaperRef};
+use paper::year_from_publish_date;
 pub use provider::{
     ArxivProvider, CandidateId, CandidateWork, CrossrefProvider, OpenAlexProvider, Provider,
     ProviderError, ProviderId, SemanticScholarProvider,
@@ -82,4 +85,39 @@ pub async fn resolve_candidate(id: &CandidateId) -> Result<CandidateWork, Provid
         ProviderId::SemanticScholar => semantic_scholar_provider()?.get(&id.native_id).await,
         ProviderId::ArXiv => arxiv_provider()?.get(&id.native_id).await,
     }
+}
+
+/// Resolves a candidate and declares it in the local library at `root`
+/// (`research/papers.nix`) — metadata only. `Artifact.source_url`/`hash`
+/// stay unset; fetching bytes and computing a Nix hash is `fetch`'s job,
+/// not `add`'s (lazy materialization, see docs/mvp.md).
+pub async fn add_candidate(id: &CandidateId, root: &Path) -> Result<PaperRef, PaxError> {
+    let work = resolve_candidate(id).await?;
+    let path = nix::papers_path(root);
+    let mut library = Library::load(&path)?;
+
+    let existing_keys: Vec<&str> = library
+        .papers()
+        .iter()
+        .map(|p| p.local.citation_key.as_str())
+        .collect();
+    let citation_key = citation_key::generate(&work, &existing_keys);
+
+    library.insert(Paper {
+        identity: Identity {
+            doi: work.doi.clone(),
+            title: work.title.clone(),
+            authors: work.authors.clone(),
+            year: year_from_publish_date(&work.publish_date),
+        },
+        artifact: Artifact::default(),
+        local: Local {
+            citation_key: citation_key.clone(),
+            tags: Vec::new(),
+            notes: None,
+        },
+    });
+    library.save(&path)?;
+
+    Ok(PaperRef(citation_key))
 }

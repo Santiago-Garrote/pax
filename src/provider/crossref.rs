@@ -68,7 +68,7 @@ impl From<::crossref::Work> for CandidateWork {
                         .join("-")
                 })
                 .unwrap_or_default(),
-            doi: value.doi,
+            doi: Some(value.doi),
         }
     }
 }
