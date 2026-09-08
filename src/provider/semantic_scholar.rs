@@ -41,6 +41,10 @@ impl Provider for SemanticScholarProvider {
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(CandidateWork::from(paper))
     }
+
+    async fn get_by_doi(&self, doi: &str) -> Result<CandidateWork, ProviderError> {
+        self.get(&format!("DOI:{doi}")).await
+    }
 }
 
 impl From<::semantic_scholar::Paper> for CandidateWork {

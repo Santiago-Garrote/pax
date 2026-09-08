@@ -39,6 +39,16 @@ impl Provider for ArxivProvider {
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(CandidateWork::from(entry))
     }
+
+    async fn search_by_author(&self, author: &str) -> Result<Vec<CandidateWork>, ProviderError> {
+        let search = Search::author(author.to_string());
+        let feed = self
+            .client
+            .search(search)
+            .await
+            .map_err(|e| ProviderError::Request(e.to_string()))?;
+        Ok(feed.entries.into_iter().map(CandidateWork::from).collect())
+    }
 }
 
 impl From<arxiv_client::Entry> for CandidateWork {

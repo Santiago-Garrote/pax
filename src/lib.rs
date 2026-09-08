@@ -81,6 +81,104 @@ pub async fn search_all(
     results
 }
 
+/// Same shape as [`search_all`], but scoped to an author name — each provider's
+/// `search_by_author` decides whether that's a true field-scoped query or (for a
+/// provider with no such endpoint) a fallback to plain full-text search.
+pub async fn search_by_author(
+    author: &str,
+    config: &Config,
+) -> HashMap<ProviderId, Result<Vec<CandidateWork>, ProviderError>> {
+    let mut results = HashMap::new();
+
+    let openalex = OpenAlexProvider::new();
+    results.insert(
+        ProviderId::OpenAlex,
+        openalex.search_by_author(author).await,
+    );
+
+    match CrossrefProvider::new() {
+        Ok(crossref) => {
+            results.insert(
+                ProviderId::Crossref,
+                crossref.search_by_author(author).await,
+            );
+        }
+        Err(e) => {
+            results.insert(ProviderId::Crossref, Err(e));
+        }
+    }
+
+    match SemanticScholarProvider::new(config.semantic_scholar_api_key.as_deref()) {
+        Ok(semantic_scholar) => {
+            results.insert(
+                ProviderId::SemanticScholar,
+                semantic_scholar.search_by_author(author).await,
+            );
+        }
+        Err(e) => {
+            results.insert(ProviderId::SemanticScholar, Err(e));
+        }
+    }
+
+    match ArxivProvider::new(config.arxiv_contact.as_deref()) {
+        Ok(arxiv) => {
+            results.insert(ProviderId::ArXiv, arxiv.search_by_author(author).await);
+        }
+        Err(e) => {
+            results.insert(ProviderId::ArXiv, Err(e));
+        }
+    }
+
+    results
+}
+
+/// Resolves a DOI directly against every provider that supports it. Same
+/// `HashMap` shape as [`search_all`] (each single resolved candidate wrapped in
+/// a one-item `Vec`) so callers can reuse the same display code — a provider
+/// with no DOI-based lookup (arXiv) reports `ProviderError::GetByIdUnsupported`
+/// via `Provider::get_by_doi`'s default, the same as any other provider error.
+pub async fn search_by_doi(
+    doi: &str,
+    config: &Config,
+) -> HashMap<ProviderId, Result<Vec<CandidateWork>, ProviderError>> {
+    let mut results = HashMap::new();
+
+    let openalex = OpenAlexProvider::new();
+    results.insert(
+        ProviderId::OpenAlex,
+        openalex.get_by_doi(doi).await.map(|work| vec![work]),
+    );
+
+    match CrossrefProvider::new() {
+        Ok(crossref) => {
+            results.insert(
+                ProviderId::Crossref,
+                crossref.get_by_doi(doi).await.map(|work| vec![work]),
+            );
+        }
+        Err(e) => {
+            results.insert(ProviderId::Crossref, Err(e));
+        }
+    }
+
+    match SemanticScholarProvider::new(config.semantic_scholar_api_key.as_deref()) {
+        Ok(semantic_scholar) => {
+            results.insert(
+                ProviderId::SemanticScholar,
+                semantic_scholar
+                    .get_by_doi(doi)
+                    .await
+                    .map(|work| vec![work]),
+            );
+        }
+        Err(e) => {
+            results.insert(ProviderId::SemanticScholar, Err(e));
+        }
+    }
+
+    results
+}
+
 /// Resolves a single, already-unambiguous candidate reference by asking its
 /// provider directly for that id — no search or disambiguation involved.
 pub async fn resolve_candidate(
@@ -238,6 +336,201 @@ mod known_dois_tests {
         ));
         let _ = fs::remove_dir_all(&root);
         assert!(known_dois(&root).is_empty());
+    }
+}
+
+/// Searches the local library without querying any provider (docs/mvp.md §2.8).
+/// Matches case-insensitively against title, authors, DOI, year, venue, tags, and
+/// citation key. Returns an empty `Vec` (not an error) when the library can't be
+/// loaded, same as `known_dois`.
+pub fn search_local(query: &str, root: &Path) -> Vec<Paper> {
+    let query = query.to_lowercase();
+    Library::load(&nix::papers_path(root))
+        .map(|library| {
+            library
+                .papers()
+                .iter()
+                .filter(|p| {
+                    p.identity.title.to_lowercase().contains(&query)
+                        || p.identity
+                            .authors
+                            .iter()
+                            .any(|a| a.to_lowercase().contains(&query))
+                        || p.identity
+                            .doi
+                            .as_deref()
+                            .is_some_and(|d| d.to_lowercase().contains(&query))
+                        || p.identity.year.is_some_and(|y| y.to_string() == query)
+                        || p.identity
+                            .venue
+                            .as_deref()
+                            .is_some_and(|v| v.to_lowercase().contains(&query))
+                        || p.local.tags.iter().any(|t| t.to_lowercase().contains(&query))
+                        || p.local.citation_key.to_lowercase().contains(&query)
+                })
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Filter criteria for `pax list` (docs/mvp.md §2.7). All fields combine with AND;
+/// a `None` field matches everything.
+#[derive(Debug, Clone, Default)]
+pub struct ListFilter {
+    pub author: Option<String>,
+    pub year: Option<i32>,
+    pub tag: Option<String>,
+}
+
+/// Applies a [`ListFilter`] to an already-loaded set of papers. Author matching
+/// is a case-insensitive substring match (like `search_local`); tag matching is
+/// exact, since tags are a short controlled vocabulary the user themselves wrote.
+pub fn filter_papers(papers: &[Paper], filter: &ListFilter) -> Vec<Paper> {
+    papers
+        .iter()
+        .filter(|p| {
+            filter.author.as_deref().is_none_or(|a| {
+                let a = a.to_lowercase();
+                p.identity
+                    .authors
+                    .iter()
+                    .any(|au| au.to_lowercase().contains(&a))
+            }) && filter.year.is_none_or(|y| p.identity.year == Some(y))
+                && filter
+                    .tag
+                    .as_deref()
+                    .is_none_or(|t| p.local.tags.iter().any(|tag| tag == t))
+        })
+        .cloned()
+        .collect()
+}
+
+#[cfg(test)]
+mod local_filter_tests {
+    use super::*;
+    use std::fs;
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "pax-local-filter-test-{name}-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("research")).unwrap();
+        dir
+    }
+
+    fn two_papers_fixture() -> &'static str {
+        r#"{
+  turing1936 = {
+    doi = "10.1112/plms/s2-42.1.230";
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    venue = "Proceedings of the London Mathematical Society";
+    source_url = null;
+    hash = null;
+    tags = [ "computability" "logic" ];
+    notes = null;
+  };
+  hewitt1973 = {
+    doi = null;
+    title = "A Universal Modular Actor Formalism";
+    authors = [ "Carl Hewitt" "Peter Bishop" "Richard Steiger" ];
+    year = 1973;
+    venue = null;
+    source_url = null;
+    hash = null;
+    tags = [ "concurrency" ];
+    notes = null;
+  };
+}
+"#
+    }
+
+    #[test]
+    fn search_local_matches_across_documented_fields() {
+        let root = scratch_dir("matches");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+
+        assert_eq!(search_local("computable", &root).len(), 1); // title
+        assert_eq!(search_local("hewitt", &root).len(), 1); // author
+        assert_eq!(search_local("10.1112", &root).len(), 1); // doi
+        assert_eq!(search_local("1973", &root).len(), 1); // year
+        assert_eq!(search_local("mathematical society", &root).len(), 1); // venue
+        assert_eq!(search_local("concurrency", &root).len(), 1); // tag
+        assert_eq!(search_local("turing1936", &root).len(), 1); // citation key
+        assert_eq!(search_local("nonexistent", &root).len(), 0);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn search_local_is_case_insensitive() {
+        let root = scratch_dir("case-insensitive");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+        assert_eq!(search_local("HEWITT", &root).len(), 1);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn filter_papers_combines_criteria_with_and() {
+        let root = scratch_dir("filter-and");
+        fs::write(nix::papers_path(&root), two_papers_fixture()).unwrap();
+        let papers = Library::load(&nix::papers_path(&root)).unwrap().papers().to_vec();
+
+        assert_eq!(
+            filter_papers(&papers, &ListFilter::default()).len(),
+            2,
+            "no filters should pass everything through"
+        );
+        assert_eq!(
+            filter_papers(
+                &papers,
+                &ListFilter {
+                    author: Some("hewitt".to_string()),
+                    ..Default::default()
+                }
+            )
+            .len(),
+            1
+        );
+        assert_eq!(
+            filter_papers(
+                &papers,
+                &ListFilter {
+                    year: Some(1936),
+                    ..Default::default()
+                }
+            )
+            .len(),
+            1
+        );
+        assert_eq!(
+            filter_papers(
+                &papers,
+                &ListFilter {
+                    tag: Some("concurrency".to_string()),
+                    ..Default::default()
+                }
+            )
+            .len(),
+            1
+        );
+        assert_eq!(
+            filter_papers(
+                &papers,
+                &ListFilter {
+                    author: Some("hewitt".to_string()),
+                    year: Some(1936),
+                    ..Default::default()
+                }
+            )
+            .len(),
+            0,
+            "combined criteria must all match (AND, not OR)"
+        );
+        fs::remove_dir_all(&root).unwrap();
     }
 }
 

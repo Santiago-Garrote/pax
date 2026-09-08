@@ -137,6 +137,20 @@ pub trait Provider {
     fn id(&self) -> ProviderId;
     async fn search(&self, query: &str) -> Result<Vec<CandidateWork>, ProviderError>;
     async fn get(&self, native_id: &str) -> Result<CandidateWork, ProviderError>;
+
+    /// Author-scoped search. Default: falls back to plain full-text `search` —
+    /// the right behavior for a provider with no true field-scoped author query
+    /// (e.g. Semantic Scholar's search endpoint has no author filter).
+    async fn search_by_author(&self, author: &str) -> Result<Vec<CandidateWork>, ProviderError> {
+        self.search(author).await
+    }
+
+    /// Resolve directly by DOI. Default: not supported — a provider without any
+    /// DOI-based lookup (e.g. arXiv) reports that explicitly rather than
+    /// guessing at a fallback that wouldn't usefully match anything.
+    async fn get_by_doi(&self, _doi: &str) -> Result<CandidateWork, ProviderError> {
+        Err(ProviderError::GetByIdUnsupported)
+    }
 }
 
 #[cfg(test)]

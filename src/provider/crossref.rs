@@ -35,6 +35,18 @@ impl Provider for CrossrefProvider {
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(CandidateWork::from(work))
     }
+
+    // No `search_by_author` override: the `crossref` crate's `FieldQuery`
+    // doesn't prefix its param key with `query.` (it sends bare `author=...`
+    // instead of `query.author=...`), which the real Crossref API rejects as a
+    // validation failure — confirmed against the live API, and 0.2.2 is the
+    // latest release, so this is a crate defect, not a usage mistake. Falls
+    // back to the trait default (plain full-text search) instead, same
+    // graceful degradation already accepted for Semantic Scholar.
+
+    async fn get_by_doi(&self, doi: &str) -> Result<CandidateWork, ProviderError> {
+        self.get(doi).await
+    }
 }
 
 impl From<::crossref::Work> for CandidateWork {

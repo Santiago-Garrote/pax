@@ -11,7 +11,19 @@ enum Command {
     ///Initiate a new empty library
     Init,
     ///Search for papers
-    Search { query: String },
+    Search {
+        /// Free-text query, searched across all providers
+        query: Option<String>,
+        /// Search by author name instead of free text
+        #[arg(long)]
+        author: Option<String>,
+        /// Resolve a DOI directly instead of searching
+        #[arg(long)]
+        doi: Option<String>,
+        /// Search only the local library, without querying any provider
+        #[arg(long)]
+        local: Option<String>,
+    },
     ///Inspect a search result before adding it
     Show {
         /// A fully-qualified reference from `search`, e.g. openalex:W2072794470
@@ -23,7 +35,17 @@ enum Command {
         reference: String,
     },
     ///List papers already declared in the library
-    List,
+    List {
+        /// Only papers with a matching author (case-insensitive substring)
+        #[arg(long)]
+        author: Option<String>,
+        /// Only papers published in this year
+        #[arg(long)]
+        year: Option<i32>,
+        /// Only papers with this exact tag
+        #[arg(long)]
+        tag: Option<String>,
+    },
     ///Remove a declared paper from the library
     Remove {
         /// The paper's citation key, e.g. turing1936
@@ -101,17 +123,57 @@ async fn main() {
             Ok(()) => sink.message("Library created"),
             Err(e) => sink.error(&e.to_string()),
         },
-        Command::Search { query } => {
-            let results = pax_core::search_all(&query, &config).await;
+        Command::Search {
+            query,
+            author,
+            doi,
+            local,
+        } => {
+            let modes = [query.is_some(), author.is_some(), doi.is_some(), local.is_some()];
+            if modes.iter().filter(|set| **set).count() != 1 {
+                sink.error("specify exactly one of QUERY, --author, --doi, or --local");
+                return;
+            }
+
+            if let Some(query) = &local {
+                sink.papers(&pax_core::search_local(query, Path::new(".")));
+                return;
+            }
+
             let known_dois = pax_core::known_dois(Path::new("."));
-            for provider in [
-                ProviderId::OpenAlex,
-                ProviderId::Crossref,
-                ProviderId::SemanticScholar,
-                ProviderId::ArXiv,
-            ] {
-                sink.provider_header(provider);
-                match results.get(&provider) {
+            let (results, providers): (_, &[ProviderId]) = if let Some(author) = &author {
+                (
+                    pax_core::search_by_author(author, &config).await,
+                    &[
+                        ProviderId::OpenAlex,
+                        ProviderId::Crossref,
+                        ProviderId::SemanticScholar,
+                        ProviderId::ArXiv,
+                    ],
+                )
+            } else if let Some(doi) = &doi {
+                (
+                    pax_core::search_by_doi(doi, &config).await,
+                    &[
+                        ProviderId::OpenAlex,
+                        ProviderId::Crossref,
+                        ProviderId::SemanticScholar,
+                    ],
+                )
+            } else {
+                (
+                    pax_core::search_all(query.as_deref().unwrap_or_default(), &config).await,
+                    &[
+                        ProviderId::OpenAlex,
+                        ProviderId::Crossref,
+                        ProviderId::SemanticScholar,
+                        ProviderId::ArXiv,
+                    ],
+                )
+            };
+            for provider in providers {
+                sink.provider_header(*provider);
+                match results.get(provider) {
                     Some(Ok(works)) => sink.candidates(works, &known_dois),
                     Some(Err(e)) => sink.error(&e.to_string()),
                     None => {}
@@ -138,10 +200,18 @@ async fn main() {
                 Err(e) => sink.error(&e.to_string()),
             }
         }
-        Command::List => {
+        Command::List { author, year, tag } => {
             match pax_core::Library::load(&pax_core::nix::papers_path(Path::new("."))) {
                 Ok(library) if library.papers().is_empty() => sink.message("Library is empty"),
-                Ok(library) => sink.papers(library.papers()),
+                Ok(library) => {
+                    let filter = pax_core::ListFilter { author, year, tag };
+                    let papers = pax_core::filter_papers(library.papers(), &filter);
+                    if papers.is_empty() {
+                        sink.message("No papers match the given filters");
+                    } else {
+                        sink.papers(&papers);
+                    }
+                }
                 Err(e) => sink.error(&e.to_string()),
             }
         }

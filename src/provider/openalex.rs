@@ -47,6 +47,29 @@ impl Provider for OpenAlexProvider {
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(CandidateWork::from(work))
     }
+
+    async fn search_by_author(&self, author: &str) -> Result<Vec<CandidateWork>, ProviderError> {
+        let params = ListParams::builder()
+            .filter(format!("raw_author_name.search:{author}"))
+            .build();
+        let response = self
+            .client
+            .list_works(&params)
+            .await
+            .map_err(|e| ProviderError::Request(e.to_string()))?;
+        Ok(response
+            .results
+            .into_iter()
+            .map(CandidateWork::from)
+            .collect())
+    }
+
+    async fn get_by_doi(&self, doi: &str) -> Result<CandidateWork, ProviderError> {
+        // OpenAlex needs the `doi:` prefix — a bare DOI contains `/`, which
+        // would otherwise be read as an extra path segment (`/works/10.1145/x`
+        // looks like two segments, not one opaque id) and 404s.
+        self.get(&format!("doi:{doi}")).await
+    }
 }
 
 impl From<papers_openalex::Work> for CandidateWork {
