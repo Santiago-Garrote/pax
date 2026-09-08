@@ -55,6 +55,11 @@ enum Command {
     },
     ///Verify declared artifacts still reproduce, without materializing them
     Check,
+    ///Open a declared paper in the configured PDF viewer, fetching it first if needed
+    Open {
+        /// The paper's citation key, e.g. turing1936
+        citation_key: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -68,6 +73,15 @@ enum ExportFormat {
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+
+fn open_in_viewer(sink: &mut impl Sink, path: &Path) {
+    let viewer = std::env::var("PAX_PDF_VIEWER").unwrap_or_else(|_| "xdg-open".to_string());
+    match std::process::Command::new(&viewer).arg(path).status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => sink.error(&format!("{viewer} exited with {status}")),
+        Err(e) => sink.error(&format!("failed to launch {viewer}: {e}")),
+    }
 }
 
 #[tokio::main]
@@ -179,5 +193,28 @@ async fn main() {
             }
             Err(e) => sink.error(&e.to_string()),
         },
+        Command::Open { citation_key } => {
+            let root = Path::new(".");
+            let resolved = match pax_core::resolve_artifact_path(&citation_key, root) {
+                Ok(pax_core::ResolvedArtifact::NotFetched) => {
+                    pax_core::fetch_paper(&citation_key, root)
+                        .and_then(|_| pax_core::resolve_artifact_path(&citation_key, root))
+                }
+                other => other,
+            };
+            match resolved {
+                Ok(pax_core::ResolvedArtifact::Path(path)) => open_in_viewer(&mut sink, &path),
+                Ok(pax_core::ResolvedArtifact::NoSourceUrl) => {
+                    sink.error(&format!(
+                        "{citation_key:?} has no PDF source recorded — the provider found no \
+                         open-access copy when it was added, so there's nothing to fetch"
+                    ));
+                }
+                Ok(pax_core::ResolvedArtifact::NotFetched) => {
+                    sink.error("fetched, but the artifact still couldn't be resolved");
+                }
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
     }
 }

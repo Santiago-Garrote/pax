@@ -65,6 +65,31 @@ pub fn prefetch_file(url: &str) -> Result<String, PaxError> {
     parse_prefetch_output(&output.stdout)
 }
 
+/// Resolves a declared paper's materialized artifact to its Nix store path,
+/// by building `research/flake.nix`'s `<citation_key>` package output.
+/// `--no-link` is required — without it, `nix build` drops a `./result`
+/// symlink in the caller's CWD, which would otherwise leak into a user's
+/// project on every `pax open`. Fast (no network) when the hash is already
+/// in the local store, since the derivation's hash is fixed upfront; the
+/// caller must ensure the paper actually has a hash before calling this, or
+/// flake evaluation fails on the `null`.
+pub fn build_package(root: &Path, citation_key: &str) -> Result<PathBuf, PaxError> {
+    let research_dir = root.join("research");
+    let flake_ref = format!("{}#{citation_key}", research_dir.display());
+    let output = Command::new("nix")
+        .args(["build", "--no-link", "--print-out-paths", &flake_ref])
+        .output()
+        .map_err(|e| PaxError::Fetch(e.to_string()))?;
+    if !output.status.success() {
+        return Err(PaxError::Fetch(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
+    }
+    Ok(PathBuf::from(
+        String::from_utf8_lossy(&output.stdout).trim(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

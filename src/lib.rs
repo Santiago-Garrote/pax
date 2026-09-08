@@ -12,7 +12,7 @@ pub mod paper;
 pub mod provider;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub use error::PaxError;
 pub use library::Library;
@@ -329,5 +329,115 @@ mod check_tests {
             CheckStatus::Error(message) => assert_eq!(message, "fetch failed: connection refused"),
             _ => panic!("expected Error"),
         }
+    }
+}
+
+/// Where a declared paper's artifact stands relative to being openable.
+pub enum ResolvedArtifact {
+    /// Materialized; here's its Nix store path.
+    Path(PathBuf),
+    /// Has a `source_url` but no `hash` yet — recoverable by fetching.
+    NotFetched,
+    /// No `source_url` at all — nothing to fetch, unrecoverable automatically.
+    NoSourceUrl,
+}
+
+/// Resolves a declared paper's materialized artifact to its Nix store path.
+/// A paper with no hash yet is reported as `NotFetched` rather than
+/// attempting a Nix build (which would fail on the `null` hash with an
+/// opaque evaluation error); one with no `source_url` at all is
+/// `NoSourceUrl`, since there's nothing to fetch even automatically.
+pub fn resolve_artifact_path(citation_key: &str, root: &Path) -> Result<ResolvedArtifact, PaxError> {
+    let path = nix::papers_path(root);
+    let library = Library::load(&path)?;
+    let paper = library
+        .find(citation_key)
+        .ok_or_else(|| PaxError::NoSuchPaper(citation_key.to_string()))?;
+
+    if paper.artifact.hash.is_none() {
+        return Ok(if paper.artifact.source_url.is_some() {
+            ResolvedArtifact::NotFetched
+        } else {
+            ResolvedArtifact::NoSourceUrl
+        });
+    }
+    Ok(ResolvedArtifact::Path(nix::build_package(
+        root,
+        citation_key,
+    )?))
+}
+
+#[cfg(test)]
+mod resolve_artifact_path_tests {
+    use super::*;
+    use std::fs;
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("pax-open-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("research")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn no_hash_but_has_source_url_is_not_fetched() {
+        let root = scratch_dir("not-fetched");
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  turing1936 = {
+    doi = null;
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    source_url = "https://example.org/turing.pdf";
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        let result = resolve_artifact_path("turing1936", &root).unwrap();
+        assert!(matches!(result, ResolvedArtifact::NotFetched));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn no_hash_and_no_source_url_is_no_source_url() {
+        let root = scratch_dir("no-source");
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  turing1936 = {
+    doi = null;
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    source_url = null;
+    hash = null;
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        let result = resolve_artifact_path("turing1936", &root).unwrap();
+        assert!(matches!(result, ResolvedArtifact::NoSourceUrl));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn unknown_citation_key_is_an_error() {
+        let root = scratch_dir("unknown-key");
+        fs::write(nix::papers_path(&root), "{\n}\n").unwrap();
+
+        let result = resolve_artifact_path("nonexistent", &root);
+        assert!(matches!(result, Err(PaxError::NoSuchPaper(_))));
+        fs::remove_dir_all(&root).unwrap();
     }
 }
