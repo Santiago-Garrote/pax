@@ -48,6 +48,11 @@ enum Command {
         #[command(subcommand)]
         format: ExportFormat,
     },
+    ///Materialize a declared paper's artifact through Nix
+    Fetch {
+        /// The paper's citation key, e.g. turing1936
+        citation_key: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -150,5 +155,11 @@ async fn main() {
             Ok(library) => sink.export(&pax_core::bibtex::render(library.papers())),
             Err(e) => sink.error(&e.to_string()),
         },
+        Command::Fetch { citation_key } => {
+            match pax_core::fetch_paper(&citation_key, Path::new(".")) {
+                Ok(outcome) => sink.fetched(&citation_key, &outcome),
+                Err(e) => sink.error(&e.to_string()),
+            }
+        }
     }
 }

@@ -214,3 +214,36 @@ pub fn edit_paper(
     library.save(&path)?;
     Ok(())
 }
+
+/// The result of `fetch_paper`: whether an artifact was newly materialized or
+/// was already fetched (and so didn't need a network call).
+pub enum FetchOutcome {
+    AlreadyFetched { hash: String },
+    Fetched { hash: String },
+}
+
+/// Materializes a declared paper's artifact through Nix and records its
+/// content hash. Idempotent: a paper that already has a hash is reported as
+/// already fetched rather than re-hitting the network — verifying a *stale*
+/// hash is `check`'s job, not `fetch`'s (see docs/mvp.md §2.6).
+pub fn fetch_paper(citation_key: &str, root: &Path) -> Result<FetchOutcome, PaxError> {
+    let path = nix::papers_path(root);
+    let mut library = Library::load(&path)?;
+    let paper = library
+        .find_mut(citation_key)
+        .ok_or_else(|| PaxError::NoSuchPaper(citation_key.to_string()))?;
+
+    if let Some(hash) = &paper.artifact.hash {
+        return Ok(FetchOutcome::AlreadyFetched { hash: hash.clone() });
+    }
+    let source_url = paper
+        .artifact
+        .source_url
+        .clone()
+        .ok_or_else(|| PaxError::NoSourceUrl(citation_key.to_string()))?;
+
+    let hash = nix::prefetch_file(&source_url)?;
+    paper.artifact.hash = Some(hash.clone());
+    library.save(&path)?;
+    Ok(FetchOutcome::Fetched { hash })
+}

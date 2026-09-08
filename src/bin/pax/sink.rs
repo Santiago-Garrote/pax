@@ -3,7 +3,7 @@
 //! output mode (e.g. JSON, for an external adapter UI) is a new `Sink` impl
 //! rather than a rewrite of every command handler.
 
-use pax_core::{CandidateWork, Paper, ProviderId};
+use pax_core::{CandidateWork, FetchOutcome, Paper, ProviderId};
 
 pub trait Sink {
     fn message(&mut self, message: &str);
@@ -14,6 +14,7 @@ pub trait Sink {
     fn papers(&mut self, papers: &[Paper]);
     fn paper(&mut self, paper: &Paper);
     fn export(&mut self, bibtex: &str);
+    fn fetched(&mut self, citation_key: &str, outcome: &FetchOutcome);
 }
 
 pub struct TextSink;
@@ -97,6 +98,17 @@ impl Sink for TextSink {
     fn export(&mut self, bibtex: &str) {
         if !bibtex.is_empty() {
             println!("{bibtex}");
+        }
+    }
+
+    fn fetched(&mut self, citation_key: &str, outcome: &FetchOutcome) {
+        match outcome {
+            FetchOutcome::AlreadyFetched { hash } => {
+                println!("Already fetched {citation_key} ({hash})");
+            }
+            FetchOutcome::Fetched { hash } => {
+                println!("Fetched {citation_key} ({hash})");
+            }
         }
     }
 }

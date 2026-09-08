@@ -18,4 +18,8 @@ pub enum PaxError {
     NoSuchPaper(String),
     #[error("nothing to edit: specify --add-tag, --remove-tag, and/or --notes")]
     NoChangesSpecified,
+    #[error("no PDF source recorded for {0:?}; nothing to fetch")]
+    NoSourceUrl(String),
+    #[error("fetch failed: {0}")]
+    Fetch(String),
 }

@@ -23,5 +23,7 @@ crossref = "0.2.2"
 dotenvy = { version = "0.15.7", optional = true }
 papers-openalex = "0.3.1"
 semantic-scholar-rs = "0.2.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2.0.20"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
