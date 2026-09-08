@@ -8,13 +8,18 @@ it should stay accurate rather than aspirational.
 
 - [x] `pax init` — scaffolds `research/flake.nix` + `research/papers.nix`
 - [x] `pax search <query>`
-- [ ] `pax search --author "..."` / `--doi "..."` flags
-- [ ] `pax search --local "query"` (local-only search, no external calls)
+- [x] `pax search --author "..."` — real field-scoped search on arXiv/OpenAlex;
+      Crossref/Semantic Scholar fall back to plain full-text search (see below)
+- [x] `pax search --doi "..."` — direct resolution on OpenAlex/Crossref/Semantic
+      Scholar (all three confirmed to resolve the same paper for the same DOI);
+      arXiv reports "not supported" (no DOI-based lookup in that crate at all)
+- [x] `pax search --local "query"` (local-only search, no external calls; matches
+      title/authors/doi/year/venue/tags/citation-key)
 - [x] `pax show <provider:id>` — unresolved candidate
 - [x] `pax show <citation-key>` — declared paper
 - [x] `pax add <provider:id>` — declares metadata + resolved PDF source URL
 - [x] `pax list` — plain listing
-- [ ] `pax list --author` / `--year` / `--tag` filters
+- [x] `pax list --author` / `--year` / `--tag` filters — combine with AND
 - [x] `pax edit <key>` — tags, notes
 - [ ] `pax edit <key>` — citation-key rename
 - [ ] `pax edit <key>` — Identity corrections (title/authors/year/doi)
@@ -87,9 +92,10 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 **The full docs/mvp.md §4 command surface is now implemented** — all 12 commands
 (`init`, `search`, `show`, `add`, `remove`, `list`, `edit`, `fetch`, `sync`, `check`,
-`open`, `export bibtex`) exist, and the display-field gaps are closed too. What's left
-is independent, no particular order: the DBLP provider, `search`/`list` filters,
-`edit` corrections, and the full cross-machine reproducibility proof (docs/mvp.md §6).
+`open`, `export bibtex`) exist, the display-field gaps are closed, and so are the
+`search`/`list` filters. What's left is independent, no particular order: the DBLP
+provider, `edit` corrections (citation-key rename, Identity fixes), and the full
+cross-machine reproducibility proof (docs/mvp.md §6).
 
 ## Design decisions worth remembering
 
@@ -119,3 +125,22 @@ is independent, no particular order: the DBLP provider, `search`/`list` filters,
   bare DOI (`"10.xxxx"`). Any code comparing two DOIs for equality (e.g. `known_dois`'
   "already in library" check) needs `pax_core::normalize_doi` first, or it'll silently
   miss real matches depending on which provider each one came from.
+- **OpenAlex needs a `doi:` prefix for id-based lookup, not a bare DOI.**
+  `get_work`'s `id` param is inserted raw into the URL path (`/works/{id}`); a bare
+  DOI contains `/` (e.g. `10.1145/358141.358147`), which reads as extra path
+  segments and 404s. Confirmed against the live API — `get_by_doi` prefixes with
+  `doi:` before calling `get()`.
+- **The `crossref` crate's `FieldQuery` doesn't work against the real API.**
+  `FieldQuery::author(name)` sends a bare `author=...` param; Crossref's actual API
+  requires `query.author=...` and rejects the bare form as a validation failure.
+  Confirmed against the live API on 0.2.2, the latest available — a crate defect,
+  not a usage mistake. `search_by_author` doesn't override the trait default for
+  Crossref (falls back to plain search) for this reason, same as Semantic Scholar.
+- **Pre-existing, unrelated to any work this session: Crossref search sometimes
+  fails to deserialize.** `pax search "Carl Hewitt"` (plain query, no filters) hits
+  `invalid serde: missing field 'family'`; other queries hit `missing field
+  'title'`. Confirmed this predates the `search`/`list`-filters work — the
+  `crossref` crate's response types appear to assume fields the live API doesn't
+  always send (e.g. an institutional/anonymous contributor with no `family` name).
+  Not fixed here — out of scope for this task, noted for whoever picks up
+  Crossref-related work next.
