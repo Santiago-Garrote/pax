@@ -22,7 +22,8 @@ it should stay accurate rather than aspirational.
 - [x] `pax fetch <key>` — materialize via `nix store prefetch-file`, write `hash`
 - [x] `pax check` — verifies every declared artifact against its recorded hash, exits
       non-zero on any mismatch/error, without writing or materializing anything
-- [ ] `pax sync` — reconcile `research/` against `papers.nix`
+- [x] `pax sync` — batch `fetch`: materializes every declared paper without a hash
+      yet, one paper's failure doesn't stop the rest, exits non-zero on any failure
 - [x] `pax open <key>` — resolves via `nix build` on `research/flake.nix` and launches
       `$PAX_PDF_VIEWER` (default `xdg-open`); fetches automatically if not yet
       materialized (deliberately no interactive prompt — see below)
@@ -77,10 +78,12 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 
 ## Critical path
 
-`fetch`, `check`, and `open` are all done — `sync` is the only piece left on the
-docs/mvp.md §4 command surface. Everything else on this list is a smaller, independent
-gap (DBLP, display fields, filters, local search, edit corrections) that doesn't block
-or get blocked by anything else.
+**The full docs/mvp.md §4 command surface is now implemented** — all 12 commands
+(`init`, `search`, `show`, `add`, `remove`, `list`, `edit`, `fetch`, `sync`, `check`,
+`open`, `export bibtex`) exist. What's left is no longer sequential/blocking: the DBLP
+provider, `search`/`list` filters, `edit` corrections, a few display-field gaps, and
+the full cross-machine reproducibility proof (docs/mvp.md §6) are all independent —
+pick any in any order.
 
 ## Design decisions worth remembering
 

@@ -9,7 +9,7 @@ PAX is a Rust project for discovering, declaring, managing, and reproducibly acq
 - PAX handles: academic search, metadata resolution, source resolution, paper declarations, local organization, bibliography export.
 - Nix handles: fetching, hashing, verification, caching, storage, garbage collection.
 
-Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see `docs/mvp.md` for the full command surface and design philosophy, and `docs/status.md` for which parts of it are actually implemented — `pax sync` is still planned, not yet built).
+Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see `docs/mvp.md` for the full command surface and design philosophy, and `docs/status.md` for which parts of it are actually implemented — the full docs/mvp.md §4 command surface is now built; what's left there is independent gaps like the DBLP provider, not more commands).
 
 **This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; a future `lazypax` TUI (or any other adapter) is meant to be just another client of the same library, per the project's own README. `docs/mvp.md` is the forward-looking spec for the full command surface — don't assume a command or flag exists just because it's documented there. **`docs/status.md` tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item.
 
@@ -48,7 +48,7 @@ src/
 
 **Reference types — the load-bearing design decision in this codebase:** `add`/`show` and `search` operate on fundamentally different address spaces, so they use different types:
 - **`CandidateId`** (`provider/mod.rs`) — a fully-qualified `provider:native_id` reference (e.g. `openalex:W2741809807`, `arxiv:2301.01234`) to a single, unresolved search hit. Its `FromStr` impl is deliberately strict: it rejects a bare DOI, a title, or free text (see `provider::tests` for the exact rejected/accepted cases). This makes "search returned two results, which one did you mean?" structurally impossible at the `add`/`show` argument boundary — disambiguation is `search`'s job (it already returns a list); `add`/`show` only ever accept a reference that is already unambiguous.
-- **`PaperRef`** (`paper.rs`) — a citation key (e.g. `turing1936`) addressing the closed set of papers already declared in the local library. Used by `remove`/`edit`/`fetch`/`open` (all implemented — see `docs/status.md` for what's still missing).
+- **`PaperRef`** (`paper.rs`) — a citation key (e.g. `turing1936`) addressing the closed set of papers already declared in the local library. Used by `remove`/`edit`/`fetch`/`open` (`sync` operates on the whole library rather than a single `PaperRef`, but reuses `fetch_paper` per key internally — see `docs/status.md`).
 
 **`Provider` trait** (`provider/mod.rs`) — `fn id()`, `async fn search(query)`, `async fn get(native_id)`. One implementation per provider module (`openalex.rs`, `crossref.rs`, `semantic_scholar.rs`, `arxiv.rs`), each also providing `From<ProviderNativeType> for CandidateWork`. `get()` is implemented for all four today (`OpenAlexClient::get_work`, `Crossref::work`, `SemanticScholar::get_paper`, `Arxiv::entry`).
 
@@ -61,8 +61,10 @@ src/
 ## Known gaps
 
 See `docs/status.md` for the full, kept-current checklist of implemented vs. missing
-pieces against `docs/mvp.md`'s target command surface. Briefly: `init`, `search`,
-`show`, `add`, `list`, `remove`, `edit`, `fetch`, `check`, `open`, and `export bibtex`
-exist; `sync` and the DBLP provider don't yet — each is meant to be a small,
-well-typed addition on top of `Provider`/`CandidateId`/`Library`/`PaperRef`, rather
-than needing another architectural change first.
+pieces against `docs/mvp.md`'s target command surface. All 12 commands from
+docs/mvp.md §4 are implemented now; what's left is independent, non-blocking gaps —
+the DBLP provider, `search`/`list` filters, `edit` corrections (citation-key rename,
+Identity fixes), and a few display fields (venue, abstract, in-library flag on search
+results) — each meant to be a small, well-typed addition on top of
+`Provider`/`CandidateId`/`Library`/`PaperRef`, rather than needing another
+architectural change first.
