@@ -121,3 +121,32 @@ pub async fn add_candidate(id: &CandidateId, root: &Path) -> Result<PaperRef, Pa
 
     Ok(PaperRef(citation_key))
 }
+
+/// The result of resolving a `show` reference: either a paper already
+/// declared in the local library, or an unresolved candidate from a
+/// provider.
+pub enum ShowResult {
+    Declared(Paper),
+    Candidate(CandidateWork),
+}
+
+/// Resolves a `show` reference. A `CandidateId` always contains `:`
+/// (`provider:native_id`); a citation key, by construction of
+/// `citation_key::generate`, never does — so the colon's presence decides
+/// which address space `reference` belongs to before either lookup is
+/// attempted, rather than trying one and falling back to the other.
+pub async fn show_reference(reference: &str, root: &Path) -> Result<ShowResult, PaxError> {
+    if !reference.contains(':') {
+        let path = nix::papers_path(root);
+        if let Ok(library) = Library::load(&path)
+            && let Some(paper) = library.find(reference)
+        {
+            return Ok(ShowResult::Declared(paper.clone()));
+        }
+        return Err(PaxError::NotFound(reference.to_string()));
+    }
+
+    let id: CandidateId = reference.parse()?;
+    let work = resolve_candidate(&id).await?;
+    Ok(ShowResult::Candidate(work))
+}

@@ -61,15 +61,9 @@ async fn main() {
             }
         }
         Command::Show { reference } => {
-            let id: CandidateId = match reference.parse() {
-                Ok(id) => id,
-                Err(e) => {
-                    sink.error(&e.to_string());
-                    return;
-                }
-            };
-            match pax_core::resolve_candidate(&id).await {
-                Ok(work) => sink.candidate(&work),
+            match pax_core::show_reference(&reference, Path::new(".")).await {
+                Ok(pax_core::ShowResult::Declared(paper)) => sink.paper(&paper),
+                Ok(pax_core::ShowResult::Candidate(work)) => sink.candidate(&work),
                 Err(e) => sink.error(&e.to_string()),
             }
         }

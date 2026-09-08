@@ -12,6 +12,7 @@ pub trait Sink {
     fn candidates(&mut self, candidates: &[CandidateWork]);
     fn candidate(&mut self, candidate: &CandidateWork);
     fn papers(&mut self, papers: &[Paper]);
+    fn paper(&mut self, paper: &Paper);
 }
 
 pub struct TextSink;
@@ -55,6 +56,25 @@ impl Sink for TextSink {
             if let Some(year) = paper.identity.year {
                 println!("\t{}", year);
             }
+        }
+    }
+
+    fn paper(&mut self, paper: &Paper) {
+        println!("Title:        {}", paper.identity.title);
+        println!("Authors:      {}", paper.identity.authors.join(", "));
+        if let Some(year) = paper.identity.year {
+            println!("Year:         {}", year);
+        }
+        println!(
+            "DOI:          {}",
+            paper.identity.doi.as_deref().unwrap_or("(no doi)")
+        );
+        println!("Citation key: {}", paper.local.citation_key);
+        if !paper.local.tags.is_empty() {
+            println!("Tags:         {}", paper.local.tags.join(", "));
+        }
+        if let Some(notes) = &paper.local.notes {
+            println!("Notes:        {}", notes);
         }
     }
 }

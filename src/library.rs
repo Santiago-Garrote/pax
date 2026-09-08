@@ -33,6 +33,10 @@ impl Library {
         self.papers.push(paper);
     }
 
+    pub fn find(&self, citation_key: &str) -> Option<&Paper> {
+        self.papers.iter().find(|p| p.local.citation_key == citation_key)
+    }
+
     pub fn load(path: &Path) -> Result<Self, PaxError> {
         let text = std::fs::read_to_string(path)?;
         let tokens = tokenize(&text)?;
@@ -473,6 +477,17 @@ mod tests {
         assert_eq!(loaded.papers(), expected.as_slice());
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn find_returns_matching_paper_or_none() {
+        let library = Library::new(sample_papers());
+
+        assert_eq!(
+            library.find("turing1936").map(|p| p.identity.title.as_str()),
+            Some("On Computable Numbers")
+        );
+        assert!(library.find("nonexistent-key").is_none());
     }
 
     #[test]
