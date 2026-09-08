@@ -46,7 +46,8 @@ it should stay accurate rather than aspirational.
 - [x] Crossref
 - [x] Semantic Scholar
 - [x] arXiv
-- [ ] DBLP — no `ProviderId` variant or client module yet
+- **Skipped, deliberately — DBLP** (see "Design decisions worth remembering" below
+  for why this isn't just "not implemented yet")
 
 ## Search-result / show display fields (docs/mvp.md §2.2/§2.3/§2.9)
 
@@ -107,9 +108,9 @@ cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
 §6's success criteria** — all 12 commands exist, the full command chain
 (`init → search → add → list → fetch → open → export bibtex`) runs end-to-end for
 real, and a `git clone`d second checkout reproduces the same artifact via `nix
-build` with zero PAX involvement (same-machine caveat noted above). The only
-thing left is the DBLP provider — optional scope, not required by §6, not blocking
-anything else.
+build` with zero PAX involvement (same-machine caveat noted above). DBLP — the
+one remaining item from docs/mvp.md's provider list — is **deliberately skipped**,
+not merely unimplemented; see below for why. Nothing else is outstanding.
 
 ## Design decisions worth remembering
 
@@ -164,3 +165,28 @@ anything else.
   must validate it against `library::is_valid_citation_key` first, or it can write
   a `papers.nix` that `Library::load` can no longer parse back — a self-inflicted
   corruption with no warning until the next read.
+- **DBLP is skipped deliberately, not just "not implemented yet."** Confirmed live
+  (not assumed) that both `dblp.org` and the `dblp.uni-trier.de` mirror now serve
+  every API request — search and per-record alike, regardless of User-Agent —
+  from behind **Anubis**, a proof-of-work anti-bot wall, instead of real data:
+  ```
+  {"rules":{"algorithm":"fast","difficulty":16}, ...}
+  ```
+  So this was never "one more provider module like the other four" — there's no
+  crate to wrap (unlike OpenAlex/Crossref/S2/arXiv), and unlike a normal from-scratch
+  HTTP+JSON integration, a plain client gets the challenge page back on every
+  request, not data. The real options, none of them cheap:
+  - Implement an Anubis proof-of-work solver so `pax` can pass the challenge before
+    every request — genuine extra engineering, and fragile by design: Anubis exists
+    specifically to keep evolving against this kind of automated bypass, so it can
+    silently break again on any DBLP-side update.
+  - Switch to DBLP's bulk XML data dump (the whole database, several GB, updated
+    periodically) and build a local search index instead of live per-query search —
+    a fundamentally different architecture from the other four providers, not a
+    same-shape addition.
+  - Or what this project has chosen: skip it. DBLP was never required by
+    docs/mvp.md §6's actual success criteria (that's about the core workflow, not
+    provider count), and deliberately automating around a bot-detection wall is a
+    step beyond normal API integration worth not taking without a specific reason
+    to. Revisit if DBLP's public access story changes, or if a specific paper only
+    findable there is actually needed.
