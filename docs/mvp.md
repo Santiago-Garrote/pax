@@ -189,7 +189,7 @@ pax sync
 
 #### `pax fetch`
 
-Materialize declared papers through Nix. (implemented — shells out to `nix store prefetch-file`)
+Materialize declared papers through Nix.
 
 #### `pax check`
 
