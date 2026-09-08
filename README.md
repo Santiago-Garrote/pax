@@ -1,3 +1,5 @@
+[![Release](https://img.shields.io/github/v/tag/Santiago-Garrote/pax?label=release)](https://github.com/Santiago-Garrote/pax/releases/tag/1.0.0)
+
 **PAX** is a Rust CLI for discovering, declaring, managing, and reproducibly acquiring academic papers using Nix as the artifact backend.
 
 The name pax comes from Latin pax, meaning peace. The idea is to bring order to the otherwise messy process of finding papers, resolving metadata, obtaining PDFs, managing references, and maintaining a reproducible research library.
