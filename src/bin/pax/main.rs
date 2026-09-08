@@ -53,6 +53,8 @@ enum Command {
         /// The paper's citation key, e.g. turing1936
         citation_key: String,
     },
+    ///Verify declared artifacts still reproduce, without materializing them
+    Check,
 }
 
 #[derive(Subcommand)]
@@ -161,5 +163,21 @@ async fn main() {
                 Err(e) => sink.error(&e.to_string()),
             }
         }
+        Command::Check => match pax_core::check_library(Path::new(".")) {
+            Ok(reports) if reports.is_empty() => sink.message("Library is empty"),
+            Ok(reports) => {
+                let failed = reports.iter().any(|r| {
+                    matches!(
+                        r.status,
+                        pax_core::CheckStatus::Mismatch { .. } | pax_core::CheckStatus::Error(_)
+                    )
+                });
+                sink.checked(&reports);
+                if failed {
+                    std::process::exit(1);
+                }
+            }
+            Err(e) => sink.error(&e.to_string()),
+        },
     }
 }

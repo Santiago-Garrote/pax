@@ -247,3 +247,87 @@ pub fn fetch_paper(citation_key: &str, root: &Path) -> Result<FetchOutcome, PaxE
     library.save(&path)?;
     Ok(FetchOutcome::Fetched { hash })
 }
+
+/// The outcome of checking a single declared paper against `nix`.
+pub enum CheckStatus {
+    /// No hash recorded yet — `fetch` hasn't run for this paper.
+    NotFetched,
+    /// The recorded hash still matches what the source URL resolves to.
+    Reproducible,
+    /// The source URL now resolves to different content than what was recorded.
+    Mismatch { expected: String, actual: String },
+    /// The source URL couldn't be resolved at all (network failure, 404, etc.).
+    Error(String),
+}
+
+pub struct CheckReport {
+    pub citation_key: String,
+    pub status: CheckStatus,
+}
+
+fn classify(expected: &str, fetched: Result<String, PaxError>) -> CheckStatus {
+    match fetched {
+        Ok(actual) if actual == expected => CheckStatus::Reproducible,
+        Ok(actual) => CheckStatus::Mismatch {
+            expected: expected.to_string(),
+            actual,
+        },
+        Err(e) => CheckStatus::Error(e.to_string()),
+    }
+}
+
+/// Verifies every declared paper's artifact still reproduces from its
+/// recorded hash, without materializing or writing anything — that's
+/// `fetch`'s job. A paper with no hash yet is reported `NotFetched` rather
+/// than as an error; one paper's network failure doesn't stop the rest of
+/// the scan (mirrors `search_all`'s per-provider error isolation).
+pub fn check_library(root: &Path) -> Result<Vec<CheckReport>, PaxError> {
+    let path = nix::papers_path(root);
+    let library = Library::load(&path)?;
+    Ok(library
+        .papers()
+        .iter()
+        .map(|paper| {
+            let status = match (&paper.artifact.hash, &paper.artifact.source_url) {
+                (Some(expected), Some(url)) => classify(expected, nix::prefetch_file(url)),
+                _ => CheckStatus::NotFetched,
+            };
+            CheckReport {
+                citation_key: paper.local.citation_key.clone(),
+                status,
+            }
+        })
+        .collect())
+}
+
+#[cfg(test)]
+mod check_tests {
+    use super::*;
+
+    #[test]
+    fn classify_matching_hash_is_reproducible() {
+        let status = classify("sha256-abc", Ok("sha256-abc".to_string()));
+        assert!(matches!(status, CheckStatus::Reproducible));
+    }
+
+    #[test]
+    fn classify_differing_hash_is_a_mismatch() {
+        let status = classify("sha256-abc", Ok("sha256-xyz".to_string()));
+        match status {
+            CheckStatus::Mismatch { expected, actual } => {
+                assert_eq!(expected, "sha256-abc");
+                assert_eq!(actual, "sha256-xyz");
+            }
+            _ => panic!("expected Mismatch"),
+        }
+    }
+
+    #[test]
+    fn classify_fetch_failure_is_an_error() {
+        let status = classify("sha256-abc", Err(PaxError::Fetch("connection refused".to_string())));
+        match status {
+            CheckStatus::Error(message) => assert_eq!(message, "fetch failed: connection refused"),
+            _ => panic!("expected Error"),
+        }
+    }
+}

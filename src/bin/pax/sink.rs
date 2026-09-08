@@ -3,7 +3,7 @@
 //! output mode (e.g. JSON, for an external adapter UI) is a new `Sink` impl
 //! rather than a rewrite of every command handler.
 
-use pax_core::{CandidateWork, FetchOutcome, Paper, ProviderId};
+use pax_core::{CandidateWork, CheckReport, CheckStatus, FetchOutcome, Paper, ProviderId};
 
 pub trait Sink {
     fn message(&mut self, message: &str);
@@ -15,6 +15,7 @@ pub trait Sink {
     fn paper(&mut self, paper: &Paper);
     fn export(&mut self, bibtex: &str);
     fn fetched(&mut self, citation_key: &str, outcome: &FetchOutcome);
+    fn checked(&mut self, reports: &[CheckReport]);
 }
 
 pub struct TextSink;
@@ -110,5 +111,36 @@ impl Sink for TextSink {
                 println!("Fetched {citation_key} ({hash})");
             }
         }
+    }
+
+    fn checked(&mut self, reports: &[CheckReport]) {
+        let (mut reproducible, mut not_fetched, mut mismatched, mut errored) = (0, 0, 0, 0);
+        for report in reports {
+            match &report.status {
+                CheckStatus::NotFetched => {
+                    not_fetched += 1;
+                    println!("{}: not fetched", report.citation_key);
+                }
+                CheckStatus::Reproducible => {
+                    reproducible += 1;
+                    println!("{}: reproducible", report.citation_key);
+                }
+                CheckStatus::Mismatch { expected, actual } => {
+                    mismatched += 1;
+                    println!(
+                        "{}: MISMATCH (expected {expected}, got {actual})",
+                        report.citation_key
+                    );
+                }
+                CheckStatus::Error(message) => {
+                    errored += 1;
+                    println!("{}: ERROR — {message}", report.citation_key);
+                }
+            }
+        }
+        println!(
+            "{} checked: {reproducible} reproducible, {not_fetched} not fetched, {mismatched} mismatched, {errored} errored",
+            reports.len()
+        );
     }
 }
