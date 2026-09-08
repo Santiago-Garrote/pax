@@ -32,6 +32,25 @@ Search → Select → Declare → Fetch → Manage → Reproduce
 
 A future lazypax TUI will provide an interactive terminal interface on top of the same PAX core.
 
+## Installation
+
+**Prebuilt binary (x86_64 Linux):** download `pax-1.0.0-x86_64-linux.tar.gz` from the [1.0.0 release](https://github.com/Santiago-Garrote/pax/releases/tag/1.0.0), extract it, and put `pax` on your `PATH`:
+
+```Bash
+curl -LO https://github.com/Santiago-Garrote/pax/releases/download/1.0.0/pax-1.0.0-x86_64-linux.tar.gz
+tar xzf pax-1.0.0-x86_64-linux.tar.gz
+./pax --version
+```
+
+**From source:** with the Nix devshell (`direnv allow`, or `nix develop`), then:
+
+```Bash
+cargo build --release
+./target/release/pax --version
+```
+
+`pax` still needs a `nix` binary on `PATH` at runtime — `fetch`/`check`/`sync`/`open` all shell out to it — so the prebuilt binary alone isn't enough without Nix installed separately.
+
 ```Bash
 pax init
 pax search "actor model"
