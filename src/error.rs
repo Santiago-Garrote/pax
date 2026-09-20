@@ -25,6 +25,10 @@ pub enum PaxError {
     NoSourceUrl(String),
     #[error("fetch failed: {0}")]
     Fetch(String),
+    #[error("build failed: {0}")]
+    Build(String),
+    #[error("upload failed: {0}")]
+    Upload(String),
     #[error("citation key {0:?} is already in use")]
     CitationKeyExists(String),
     #[error(

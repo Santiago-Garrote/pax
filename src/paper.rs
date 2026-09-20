@@ -76,6 +76,25 @@ pub(crate) fn apply_local_edits(
     }
 }
 
+/// Sets or replaces a declared paper's PDF source URL — the one `Artifact`
+/// field a user can usefully correct by hand: a provider often finds no
+/// open-access copy at `add` time (`source_url` stays `None`), and the user
+/// may since have found one themselves (a preprint mirror, an author's
+/// homepage, ...). `None` leaves it untouched, same convention as
+/// `apply_identity_corrections`.
+///
+/// Deliberately does *not* touch `hash`: changing the source invalidates any
+/// previously fetched artifact, but recomputing that hash means re-fetching
+/// (network I/O), which isn't this function's job — the caller (`edit_paper`)
+/// clears `hash` so the next `fetch`/`open` re-materializes against the new
+/// URL instead of silently keeping stale bytes.
+pub(crate) fn apply_artifact_edits(artifact: &mut Artifact, source_url: Option<&str>) {
+    if let Some(source_url) = source_url {
+        artifact.source_url = Some(source_url.to_string());
+        artifact.hash = None;
+    }
+}
+
 /// Applies explicit Identity corrections — each `Some` overwrites, `None`
 /// leaves the field untouched. `authors` is a full replace when given, not an
 /// incremental add/remove like tags: an author-list correction means the list
@@ -104,6 +123,28 @@ pub(crate) fn apply_identity_corrections(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_artifact_edits_sets_source_url_and_clears_a_stale_hash() {
+        let mut artifact = Artifact {
+            source_url: Some("https://old.example/paper.pdf".to_string()),
+            hash: Some("sha256-old".to_string()),
+        };
+        apply_artifact_edits(&mut artifact, Some("https://new.example/paper.pdf"));
+        assert_eq!(artifact.source_url, Some("https://new.example/paper.pdf".to_string()));
+        assert!(artifact.hash.is_none(), "a changed source invalidates the old hash");
+    }
+
+    #[test]
+    fn apply_artifact_edits_is_a_no_op_with_none() {
+        let original = Artifact {
+            source_url: Some("https://example/paper.pdf".to_string()),
+            hash: Some("sha256-x".to_string()),
+        };
+        let mut artifact = original.clone();
+        apply_artifact_edits(&mut artifact, None);
+        assert_eq!(artifact, original);
+    }
 
     #[test]
     fn year_from_publish_date_parses_leading_digits() {

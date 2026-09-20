@@ -79,6 +79,10 @@ enum Command {
         /// Correct the paper's DOI
         #[arg(long)]
         doi: Option<String>,
+        /// Set/replace the paper's PDF source URL (e.g. a copy found by hand
+        /// after `add` recorded none); invalidates any already-fetched hash
+        #[arg(long = "source-url")]
+        source_url: Option<String>,
     },
     ///Export the local library
     Export {
@@ -246,6 +250,7 @@ async fn main() {
             author,
             year,
             doi,
+            source_url,
         } => {
             let edits = pax_core::PaperEdits {
                 add_tags: add_tag,
@@ -256,6 +261,7 @@ async fn main() {
                 authors: if author.is_empty() { None } else { Some(author) },
                 year,
                 doi,
+                source_url,
             };
             match pax_core::edit_paper(&citation_key, Path::new("."), &edits) {
                 Ok(()) => sink.message(&format!("Updated {citation_key}")),

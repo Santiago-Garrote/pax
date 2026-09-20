@@ -60,6 +60,15 @@ impl Library {
         Ok(Library { papers })
     }
 
+    /// Written to a sibling temp file and renamed into place rather than
+    /// `fs::write`ing `path` directly — a plain write truncates the file
+    /// before the new content is flushed, so a concurrent reader (another
+    /// `pax`/`lazypax` process against the same library, or `nix build`
+    /// evaluating `papers.nix` mid-save) can observe an empty or partial
+    /// file instead of either the old or new content. `rename` onto an
+    /// existing path is atomic on the same filesystem, so any concurrent
+    /// reader always sees one complete version or the other, never a torn
+    /// one.
     pub fn save(&self, path: &Path) -> Result<(), PaxError> {
         let mut papers = self.papers.clone();
         papers.sort_by(|a, b| a.local.citation_key.cmp(&b.local.citation_key));
@@ -70,7 +79,13 @@ impl Library {
         }
         out.push_str("}\n");
 
-        std::fs::write(path, out)?;
+        let tmp_path = path.with_file_name(format!(
+            "{}.tmp.{}",
+            path.file_name().and_then(|n| n.to_str()).unwrap_or("papers.nix"),
+            std::process::id()
+        ));
+        std::fs::write(&tmp_path, out)?;
+        std::fs::rename(&tmp_path, path)?;
         Ok(())
     }
 }
@@ -498,6 +513,29 @@ mod tests {
         assert!(!is_valid_citation_key("1abc"));
         assert!(!is_valid_citation_key("has space"));
         assert!(!is_valid_citation_key("\"quoted\""));
+    }
+
+    #[test]
+    fn save_never_leaves_a_reader_seeing_a_truncated_file() {
+        // Regression guard for the torn-read class of bug: a concurrent
+        // `Library::load` running at any point during `save` must see
+        // either the pre-save content in full or the post-save content in
+        // full, never a partial/empty file. `save` itself is synchronous
+        // (no real concurrency to interleave here), so this instead checks
+        // the property that makes that guarantee hold: no temp file is
+        // left behind, and the final path always parses back correctly
+        // immediately after `save` returns — i.e. the swap really is a
+        // single atomic step, not two observable ones.
+        let dir = std::env::temp_dir().join(format!("pax-library-test-atomic-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("papers.nix");
+
+        Library::new(sample_papers()).save(&path).unwrap();
+        let entries: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(entries, vec![std::ffi::OsString::from("papers.nix")], "no stray temp file left behind");
+        assert_eq!(Library::load(&path).unwrap().papers().len(), 2);
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use ::semantic_scholar::SemanticScholar;
 
-use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId};
+use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId, SEARCH_RESULT_LIMIT};
 
 pub struct SemanticScholarProvider {
     client: SemanticScholar,
@@ -26,6 +26,7 @@ impl Provider for SemanticScholarProvider {
         let result = self
             .client
             .search_papers(query)
+            .limit(SEARCH_RESULT_LIMIT as u32)
             .send()
             .await
             .map_err(|e| ProviderError::Request(e.to_string()))?;

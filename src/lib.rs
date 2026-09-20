@@ -6,15 +6,18 @@
 pub mod bibtex;
 mod citation_key;
 pub mod error;
+pub mod github;
 pub mod library;
 pub mod nix;
 pub mod paper;
+mod process;
 pub mod provider;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub use error::PaxError;
+pub use github::publish_to_github_release;
 pub use library::Library;
 pub use nix::init_library;
 use paper::year_from_publish_date;
@@ -597,6 +600,13 @@ pub struct PaperEdits {
     pub authors: Option<Vec<String>>,
     pub year: Option<i32>,
     pub doi: Option<String>,
+    /// Sets/replaces `Artifact.source_url` — the recovery path for a paper a
+    /// provider declared with no open-access copy (`NoSourceUrl`/"has no PDF
+    /// source recorded"): the user can find one by hand and record it here.
+    /// Changing it invalidates any already-fetched `hash` (see
+    /// `paper::apply_artifact_edits`), so the next `fetch`/`open`
+    /// re-materializes against the new URL instead of keeping stale bytes.
+    pub source_url: Option<String>,
 }
 
 impl PaperEdits {
@@ -609,6 +619,7 @@ impl PaperEdits {
             && self.authors.is_none()
             && self.year.is_none()
             && self.doi.is_none()
+            && self.source_url.is_none()
     }
 }
 
@@ -654,6 +665,7 @@ pub fn edit_paper(citation_key: &str, root: &Path, edits: &PaperEdits) -> Result
         edits.year,
         edits.doi.as_deref(),
     );
+    paper::apply_artifact_edits(&mut paper.artifact, edits.source_url.as_deref());
     library.save(&path)?;
     Ok(())
 }
@@ -767,6 +779,45 @@ mod edit_paper_tests {
         assert!(matches!(result, Err(PaxError::NoChangesSpecified)));
         fs::remove_dir_all(&root).unwrap();
     }
+
+    #[test]
+    fn setting_a_source_url_persists_it_and_clears_any_existing_hash() {
+        let root = scratch_dir("source-url");
+        fs::write(
+            nix::papers_path(&root),
+            r#"{
+  turing1936 = {
+    doi = null;
+    title = "On Computable Numbers";
+    authors = [ "Alan Turing" ];
+    year = 1936;
+    venue = null;
+    source_url = null;
+    hash = "sha256-stale";
+    tags = [ ];
+    notes = null;
+  };
+}
+"#,
+        )
+        .unwrap();
+
+        edit_paper(
+            "turing1936",
+            &root,
+            &PaperEdits {
+                source_url: Some("https://example.org/turing.pdf".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let library = Library::load(&nix::papers_path(&root)).unwrap();
+        let paper = library.find("turing1936").unwrap();
+        assert_eq!(paper.artifact.source_url.as_deref(), Some("https://example.org/turing.pdf"));
+        assert!(paper.artifact.hash.is_none(), "a changed source invalidates the old hash");
+        fs::remove_dir_all(&root).unwrap();
+    }
 }
 
 /// The result of `fetch_paper`: whether an artifact was newly materialized or
@@ -796,7 +847,7 @@ pub fn fetch_paper(citation_key: &str, root: &Path) -> Result<FetchOutcome, PaxE
         .clone()
         .ok_or_else(|| PaxError::NoSourceUrl(citation_key.to_string()))?;
 
-    let hash = nix::prefetch_file(&source_url)?;
+    let hash = nix::prefetch_file(&source_url, citation_key)?;
     paper.artifact.hash = Some(hash.clone());
     library.save(&path)?;
     Ok(FetchOutcome::Fetched { hash })
@@ -973,7 +1024,9 @@ pub fn check_library(root: &Path) -> Result<Vec<CheckReport>, PaxError> {
         .iter()
         .map(|paper| {
             let status = match (&paper.artifact.hash, &paper.artifact.source_url) {
-                (Some(expected), Some(url)) => classify(expected, nix::prefetch_file(url)),
+                (Some(expected), Some(url)) => {
+                    classify(expected, nix::prefetch_file(url, &paper.local.citation_key))
+                }
                 _ => CheckStatus::NotFetched,
             };
             CheckReport {

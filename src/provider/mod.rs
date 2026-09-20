@@ -12,6 +12,15 @@ use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
 
+/// Shared result-count cap each provider's `search`/`search_by_author` asks
+/// for explicitly, instead of leaving it unset and getting whatever small
+/// default that provider's own API falls back to (OpenAlex 25, Crossref 20,
+/// Semantic Scholar 10, arXiv 10 as of writing) — the gap between those
+/// defaults and a subject with many matches (e.g. a broad CS query) is
+/// exactly why `search`'s results can look sparser than the library actually
+/// has to offer.
+pub(crate) const SEARCH_RESULT_LIMIT: usize = 50;
+
 /// Which external metadata source a [`CandidateId`] or [`CandidateWork`] came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProviderId {

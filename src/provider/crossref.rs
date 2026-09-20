@@ -1,6 +1,7 @@
-use ::crossref::Crossref;
+use ::crossref::query::ResultControl;
+use ::crossref::{Crossref, WorkResultControl, WorksQuery};
 
-use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId};
+use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId, SEARCH_RESULT_LIMIT};
 
 pub struct CrossrefProvider {
     client: Crossref,
@@ -21,9 +22,11 @@ impl Provider for CrossrefProvider {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<CandidateWork>, ProviderError> {
+        let query = WorksQuery::new(query)
+            .result_control(WorkResultControl::Standard(ResultControl::Rows(SEARCH_RESULT_LIMIT)));
         let works = self
             .client
-            .works(query.to_string())
+            .works(query)
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(works.items.into_iter().map(CandidateWork::from).collect())
     }

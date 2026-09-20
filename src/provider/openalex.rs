@@ -1,6 +1,6 @@
 use papers_openalex::{GetParams, ListParams, OpenAlexClient};
 
-use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId};
+use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId, SEARCH_RESULT_LIMIT};
 
 pub struct OpenAlexProvider {
     client: OpenAlexClient,
@@ -26,7 +26,10 @@ impl Provider for OpenAlexProvider {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<CandidateWork>, ProviderError> {
-        let params = ListParams::builder().search(query.to_string()).build();
+        let params = ListParams::builder()
+            .search(query.to_string())
+            .per_page(SEARCH_RESULT_LIMIT as u32)
+            .build();
         let response = self
             .client
             .list_works(&params)
@@ -51,6 +54,7 @@ impl Provider for OpenAlexProvider {
     async fn search_by_author(&self, author: &str) -> Result<Vec<CandidateWork>, ProviderError> {
         let params = ListParams::builder()
             .filter(format!("raw_author_name.search:{author}"))
+            .per_page(SEARCH_RESULT_LIMIT as u32)
             .build();
         let response = self
             .client

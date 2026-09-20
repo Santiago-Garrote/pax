@@ -1,6 +1,6 @@
-use arxiv_client::{Arxiv, Search};
+use arxiv_client::{Arxiv, Query, Search};
 
-use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId};
+use super::{CandidateId, CandidateWork, Provider, ProviderError, ProviderId, SEARCH_RESULT_LIMIT};
 
 pub struct ArxivProvider {
     client: Arxiv,
@@ -22,10 +22,10 @@ impl Provider for ArxivProvider {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<CandidateWork>, ProviderError> {
-        let search = Search::title(query.to_string());
+        let query = Query::new(Search::title(query.to_string())).max_results(SEARCH_RESULT_LIMIT);
         let feed = self
             .client
-            .search(search)
+            .search(query)
             .await
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(feed.entries.into_iter().map(CandidateWork::from).collect())
@@ -41,10 +41,10 @@ impl Provider for ArxivProvider {
     }
 
     async fn search_by_author(&self, author: &str) -> Result<Vec<CandidateWork>, ProviderError> {
-        let search = Search::author(author.to_string());
+        let query = Query::new(Search::author(author.to_string())).max_results(SEARCH_RESULT_LIMIT);
         let feed = self
             .client
-            .search(search)
+            .search(query)
             .await
             .map_err(|e| ProviderError::Request(e.to_string()))?;
         Ok(feed.entries.into_iter().map(CandidateWork::from).collect())
