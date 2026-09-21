@@ -207,7 +207,7 @@ pub async fn resolve_candidate(
 /// Resolves a candidate and declares it in the local library at `root`
 /// (`research/papers.nix`) — metadata only. `Artifact.source_url`/`hash`
 /// stay unset; fetching bytes and computing a Nix hash is `fetch`'s job,
-/// not `add`'s (lazy materialization, see docs/mvp.md).
+/// not `add`'s (lazy materialization, see pax-project/.github's mvp.md).
 pub async fn add_candidate(
     id: &CandidateId,
     root: &Path,
@@ -342,7 +342,7 @@ mod known_dois_tests {
     }
 }
 
-/// Searches the local library without querying any provider (docs/mvp.md §2.8).
+/// Searches the local library without querying any provider (pax-project/.github's mvp.md §2.8).
 /// Matches case-insensitively against title, authors, DOI, year, venue, tags, and
 /// citation key. Returns an empty `Vec` (not an error) when the library can't be
 /// loaded, same as `known_dois`.
@@ -377,7 +377,7 @@ pub fn search_local(query: &str, root: &Path) -> Vec<Paper> {
         .unwrap_or_default()
 }
 
-/// Filter criteria for `pax list` (docs/mvp.md §2.7). All fields combine with AND;
+/// Filter criteria for `pax list` (pax-project/.github's mvp.md §2.7). All fields combine with AND;
 /// a `None` field matches everything.
 #[derive(Debug, Clone, Default)]
 pub struct ListFilter {
@@ -572,7 +572,7 @@ pub async fn show_reference(
 
 /// Removes a declared paper from the local library at `root`. Only the
 /// declaration/metadata is removed — Nix remains responsible for garbage
-/// collecting any unused artifacts on its own (see docs/mvp.md).
+/// collecting any unused artifacts on its own (see pax-project/.github's mvp.md).
 pub fn remove_paper(citation_key: &str, root: &Path) -> Result<(), PaxError> {
     let path = nix::papers_path(root);
     let mut library = Library::load(&path)?;
@@ -585,7 +585,7 @@ pub fn remove_paper(citation_key: &str, root: &Path) -> Result<(), PaxError> {
 
 /// What to change about a declared paper, passed to [`edit_paper`]. Every
 /// field is opt-in — only a field that's `Some`/non-empty gets touched,
-/// matching docs/mvp.md §2.10: "the original external metadata should not be
+/// matching pax-project/.github's mvp.md §2.10: "the original external metadata should not be
 /// silently overwritten without user intent."
 #[derive(Debug, Clone, Default)]
 pub struct PaperEdits {
@@ -830,7 +830,7 @@ pub enum FetchOutcome {
 /// Materializes a declared paper's artifact through Nix and records its
 /// content hash. Idempotent: a paper that already has a hash is reported as
 /// already fetched rather than re-hitting the network — verifying a *stale*
-/// hash is `check`'s job, not `fetch`'s (see docs/mvp.md §2.6).
+/// hash is `check`'s job, not `fetch`'s (see pax-project/.github's mvp.md §2.6).
 pub fn fetch_paper(citation_key: &str, root: &Path) -> Result<FetchOutcome, PaxError> {
     let path = nix::papers_path(root);
     let mut library = Library::load(&path)?;

@@ -28,7 +28,7 @@ pub struct Local {
 }
 
 /// A paper declared in the local library, per the three-part shape from
-/// docs/mvp.md: identity (what the paper is), artifact (where/how Nix
+/// pax-project/.github's mvp.md: identity (what the paper is), artifact (where/how Nix
 /// fetches it), and local metadata (how the user organizes it).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Paper {
