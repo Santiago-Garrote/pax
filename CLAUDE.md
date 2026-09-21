@@ -9,9 +9,9 @@ PAX is a Rust project for discovering, declaring, managing, and reproducibly acq
 - PAX handles: academic search, metadata resolution, source resolution, paper declarations, local organization, bibliography export.
 - Nix handles: fetching, hashing, verification, caching, storage, garbage collection.
 
-Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see [the org's `mvp.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/mvp.md) for the full command surface and design philosophy, and [`status.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/status.md) for which parts of it are actually implemented — the full mvp.md §4 command surface is now built; what's left there is independent gaps like the DBLP provider, not more commands).
+Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see [the org's `mvp.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/mvp.md) for the full command surface and design philosophy, and [`status.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/status.md) for which parts of it are actually implemented — the full mvp.md §4 command surface is now built; what's left there is independent gaps like the DBLP provider, not more commands).
 
-**This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax/main.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; [`lazypax`](https://github.com/pax-project/lazy-pax) is a separate repo that's just another client of the same library — README.md itself doesn't mention it, since lazy-pax depends on pax-core and not the other way around. The [org's `mvp.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/mvp.md) is the original, pre-implementation spec for the full command surface — don't assume a command or flag exists just because it's documented there. **[`status.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/status.md) tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item. Neither file lives in this repo — see "Known gaps" below for why.
+**This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax/main.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; [`lazypax`](https://github.com/pax-project/lazy-pax) is a separate repo that's just another client of the same library — README.md itself doesn't mention it, since lazy-pax depends on pax-core and not the other way around. The [org's `mvp.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/mvp.md) is the original, pre-implementation spec for the full command surface — don't assume a command or flag exists just because it's documented there. **[`status.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/status.md) tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item. Neither file lives in this repo — see "Known gaps" below for why.
 
 ## Environment
 
@@ -68,10 +68,10 @@ src/
 
 ## Known gaps
 
-[`status.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/status.md)
+[`status.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/status.md)
 in the `pax-project` org's `.github` repo is the single, kept-current source
 of truth for what's implemented vs. missing against
-[`mvp.md`](https://github.com/pax-project/.github/blob/main/docs/goals/pax-core/mvp.md)'s
+[`mvp.md`](https://github.com/pax-project/.github/blob/main/docs/pax-core/mvp.md)'s
 target command surface — check it rather than this file, so gap status
 never has to be kept in sync in two places. Both live in the org repo, not
 here, so this repo's own docs never drift into describing a moving target.
