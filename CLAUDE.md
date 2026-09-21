@@ -11,7 +11,7 @@ PAX is a Rust project for discovering, declaring, managing, and reproducibly acq
 
 Intended workflow: `Search → Select → Declare → Fetch → Manage → Reproduce` (see `docs/mvp.md` for the full command surface and design philosophy, and `docs/status.md` for which parts of it are actually implemented — the full docs/mvp.md §4 command surface is now built; what's left there is independent gaps like the DBLP provider, not more commands).
 
-**This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; a future `lazypax` TUI (or any other adapter) is meant to be just another client of the same library, per the project's own README. `docs/mvp.md` is the forward-looking spec for the full command surface — don't assume a command or flag exists just because it's documented there. **`docs/status.md` tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item.
+**This repository's primary artifact is `pax-core`, a library — not a CLI tool that happens to have a core module.** The `pax` binary (`src/bin/pax/main.rs`) is a thin, optional client of that library, gated behind the `cli` Cargo feature; [`lazypax`](https://github.com/pax-project/lazy-pax) is a separate repo that's just another client of the same library, per the project's own README. `docs/mvp.md` is the original, pre-implementation spec for the full command surface — don't assume a command or flag exists just because it's documented there. **`docs/status.md` tracks exactly which parts of that spec are implemented today vs. still missing** — check it before assuming something is done or not done; keep it updated when you close or reopen an item.
 
 ## Environment
 
@@ -35,15 +35,21 @@ cargo clippy                       # lint
 
 ```
 src/
-  lib.rs        # pax-core's public API: re-exports + search_all()
-  provider/     # Provider trait, ProviderId, CandidateId, CandidateWork, ProviderError
-    mod.rs      #   + the four provider implementations, one file each
-  paper.rs      # Paper, Identity, Artifact, Local, PaperRef (citation key)
-  library.rs    # Library::load()/save() against research/papers.nix
-  nix.rs        # init_library(): scaffolds research/flake.nix + research/papers.nix from templates/
-  error.rs      # PaxError, unifying ProviderError + io/parse errors
+  lib.rs          # pax-core's public API: re-exports + search_all()
+  provider/       # Provider trait, ProviderId, CandidateId, CandidateWork, ProviderError
+    mod.rs        #   + the four provider implementations, one file each
+  paper.rs        # Paper, Identity, Artifact, Local, PaperRef (citation key)
+  library.rs      # Library::load()/save() against research/papers.nix
+  nix.rs          # init_library(): scaffolds research/flake.nix + research/papers.nix from templates/
+  citation_key.rs # generates a citation key for a newly declared paper (surname+year, disambiguated)
+  bibtex.rs       # renders declared papers as BibTeX (bibtex::render)
+  github.rs       # publish_to_github_release: shells out to `gh` to publish a local PDF as a release asset
+  process.rs      # shared subprocess-with-timeout helper for anything shelling out (nix, gh)
+  error.rs        # PaxError, unifying ProviderError + io/parse errors
   bin/
-    pax.rs      # clap CLI — argument parsing, dispatch, output formatting only
+    pax/
+      main.rs     # clap CLI — argument parsing, dispatch, output formatting only
+      sink.rs     # output formatting helpers for the CLI
 ```
 
 **Reference types — the load-bearing design decision in this codebase:** `add`/`show` and `search` operate on fundamentally different address spaces, so they use different types:
@@ -62,11 +68,6 @@ src/
 
 ## Known gaps
 
-See `docs/status.md` for the full, kept-current checklist of implemented vs. missing
-pieces against `docs/mvp.md`'s target command surface. All 12 commands from
-docs/mvp.md §4 are implemented now; what's left is independent, non-blocking gaps —
-the DBLP provider, `search`/`list` filters, `edit` corrections (citation-key rename,
-Identity fixes), and a few display fields (venue, abstract, in-library flag on search
-results) — each meant to be a small, well-typed addition on top of
-`Provider`/`CandidateId`/`Library`/`PaperRef`, rather than needing another
-architectural change first.
+`docs/status.md` is the single, kept-current source of truth for what's implemented
+vs. missing against `docs/mvp.md`'s target command surface — check it rather than
+this file, so gap status never has to be kept in sync in two places.

@@ -1,5 +1,12 @@
 # PAX — MVP CLI Features
 
+> This is the original, pre-implementation MVP spec — kept as-is for
+> historical reference. It predates `lazypax` existing as its own project and
+> DBLP being dropped as a provider; both are noted inline below rather than
+> rewritten. **For what's actually built today, see `docs/status.md`**, which
+> tracks this spec's command surface against the current implementation and
+> is kept up to date.
+
 ## 1. Purpose
 
 PAX is a Rust CLI for discovering, declaring, managing, and reproducibly acquiring academic papers using Nix as the artifact backend.
@@ -65,7 +72,8 @@ The MVP should initially support only a small number of reliable providers:
 - Crossref — DOI resolution and canonical bibliographic metadata.
 - Semantic Scholar — academic discovery, citations, references, and related papers.
 - arXiv — preprints and papers, particularly for computer science, mathematics, and physics.
-- DBLP — specialized computer-science bibliography and metadata. (will need client implementation)
+- DBLP — specialized computer-science bibliography and metadata. (deliberately
+  skipped — see `docs/status.md`'s "Design decisions worth remembering" for why)
 
 These providers should be implemented behind a common PAX discovery interface so that adding providers later does not require changing the CLI or paper model.
 
@@ -421,7 +429,7 @@ Optional aliases can be added later.
 The following should explicitly remain outside the MVP:
 
 * TUI
-* `lazypax`
+* `lazypax` (now its own project: https://github.com/pax-project/lazy-pax)
 * Plugin system
 * Web interface
 * PDF annotation
@@ -475,7 +483,7 @@ A second machine should be able to reconstruct the same declared paper artifacts
 
 ---
 
-## 8. MVP Philosophy
+## 7. MVP Philosophy
 
 The CLI should remain:
 
@@ -488,5 +496,6 @@ The CLI should remain:
 * Independent of a graphical interface
 * Useful without the future TUI
 
-The future `lazypax` interface should consume the same PAX functionality rather than becoming a separate implementation.
+[`lazypax`](https://github.com/pax-project/lazy-pax) consumes the same PAX
+functionality (via `pax-core`) rather than being a separate implementation.
 
