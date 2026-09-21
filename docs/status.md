@@ -98,9 +98,11 @@ it should stay accurate rather than aspirational.
 
 ## Non-goals — explicitly not required (docs/mvp.md §5)
 
-TUI, `lazypax`, plugin system, web UI, PDF annotation, full-text indexing, citation
-graph, recommendations, AI summaries, auto lit-reviews, Neovim/Zotero integration,
-cloud sync, embedded Nix evaluator, custom artifact store, dozens of providers.
+Embedded Nix evaluator, custom artifact store — these would cross PAX's core
+division of responsibility with Nix. Everything else once listed here was
+either built (`lazypax`) or moved to the
+[org idea backlog](https://github.com/pax-project/.github/blob/main/docs/ideas/) —
+see `docs/mvp.md §5` for the full reasoning.
 
 ## Critical path
 

@@ -426,24 +426,21 @@ Optional aliases can be added later.
 
 ## 5. MVP Non-Goals
 
-The following should explicitly remain outside the MVP:
+The following should explicitly remain outside the MVP, because they'd cross
+PAX's core division of responsibility with Nix (§1: "PAX understands papers,
+Nix understands artifacts"):
 
-* TUI
-* `lazypax` (now its own project: https://github.com/pax-project/lazy-pax)
-* Plugin system
-* Web interface
-* PDF annotation
-* Full-text PDF indexing
-* Citation graph
-* Related-paper recommendations
-* AI summaries
-* Automatic literature reviews
-* Neovim integration
-* Zotero synchronization
-* Cloud synchronization
 * Embedded Nix evaluator
 * Custom package/artifact store
-* Dozens of metadata providers
+
+Every other feature once listed here (TUI/`lazypax`, plugin system, web
+interface, PDF annotation, full-text indexing, citation graph, related-paper
+recommendations, AI summaries, auto lit-reviews, Neovim/Zotero/cloud sync,
+more providers) was either built (`lazypax` — see
+https://github.com/pax-project/lazy-pax) or is tracked as an idea in the
+[pax-project org's idea backlog](https://github.com/pax-project/.github/blob/main/docs/ideas/)
+rather than enumerated here, since it's a deferred feature, not an
+architectural boundary.
 
 The MVP should prove the core architecture before expanding the feature set.
 
