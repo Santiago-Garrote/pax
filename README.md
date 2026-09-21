@@ -30,8 +30,6 @@ The intended workflow is:
 Search → Select → Declare → Fetch → Manage → Reproduce
 ```
 
-[`lazypax`](https://github.com/pax-project/lazy-pax) provides an interactive terminal interface on top of the same PAX core.
-
 ## Installation
 
 **Prebuilt binary (x86_64 Linux):** download `pax-1.1.0-x86_64-linux.tar.gz` from the [1.1.0 release](https://github.com/pax-project/pax-core/releases/tag/1.1.0), extract it, and put `pax` on your `PATH`:
